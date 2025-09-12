@@ -1,0 +1,15 @@
+values:
+  # Baseline defaults shared by every environment. Later files in the
+  # `files:` list (see examples/basic/dev.yaml) can override entries
+  # with the same `name`.
+  - name: SOMETHING
+    value: '-'
+    description: 'This is definitely something.'
+
+  - name: SOMETHING_ELSE
+    value: '-'
+    description: 'Pretty sure this is something else.'
+
+  - name: ANOTHER_SOMETHING
+    value: 'false'
+    description: 'Something that has been set to be false by default.'

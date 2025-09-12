@@ -1,0 +1,7 @@
+values:
+  # Environment-specific overrides. Because this file is listed after
+  # vars/default.yaml inside examples/basic/dev.yaml, any entries with
+  # matching `name` values replace the defaults above.
+  - name: ANOTHER_SOMETHING
+    value: 'true' # Overrides the 'false' default defined in vars/default.yaml.
+    description: 'Something that has been set to be false by default.'

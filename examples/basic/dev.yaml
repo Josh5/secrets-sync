@@ -1,0 +1,63 @@
+vars:
+  # [OPTIONAL] Config-scoped variables used for template interpolation
+  # (e.g., {{ ENVIRONMENT_NAME }} in prefixes below).
+  ENVIRONMENT_NAME: dev
+
+aws:
+  # [OPTIONAL] Override the AWS region or CLI profile used for boto3 calls.
+  # If omitted, the CLI falls back to AWS_DEFAULT_REGION / AWS_REGION
+  # and AWS_PROFILE (or exported credentials such as AWS_ACCESS_KEY_ID).
+  #region: ap-southeast-2                                     # Uncomment to force a specific region.
+  #profile: default                                           # Uncomment to force use of a named profile.
+
+sources:
+  # [REQUIRED] Define one or more inputs to pull values from (env, yaml, 1password, etc).
+  # Each entry needs a type, and should have a unique name if you plan to reference it from sinks.
+
+  # Example: Local YAML config. Useful for plain configuration values that are OK to keep in git.
+  - name: config                                              # [RECOMMENDED] Friendly label so sinks can reference this source.
+    type: yaml                                                # [REQUIRED] 'yaml' instructs the CLI to merge YAML files.
+    options:
+      files:                                                  # [REQUIRED] Ordered list of YAML files to merge (later entries override earlier ones).
+        - vars/default.yaml
+        - vars/dev.yaml
+      key: values                                             # [OPTIONAL] Dot-path inside each YAML file that holds the entries.
+
+  # Example: 1Password source. Pulls secrets out of your 1Password vault.
+  - name: 1password
+    type: 1password                                           # [REQUIRED] Enables the 1Password source handler.
+    options:
+      vault: 'EnvironmentSecrets'                             # [REQUIRED] Vault name to read from.
+      include_regex: '^APP_.*'                                # [OPTIONAL] Only include items whose title matches this regex.
+      tag_filters:                                            # [OPTIONAL] Any matching tag qualifies an item for inclusion.
+        - default
+        - test-1
+
+sinks:
+  # [REQUIRED] Define where gathered values are written (SSM, Secrets Manager, etc).
+  # Each sink can optionally restrict which sources it consumes via the 'sources' list.
+
+  # Example: Push non-secret config values to SSM as plaintext Strings.
+  - type: ssm                                                 # [REQUIRED] Use AWS Systems Manager Parameter Store.
+    options:
+      prefix: '/env/{{ ENVIRONMENT_NAME }}/config/'           # [OPTIONAL] Prefix added to each parameter name.
+      overwrite: true                                         # [OPTIONAL] Default true; overwrite existing parameters when true.
+      type: String                                            # [OPTIONAL] Force plaintext parameters (default is SecureString).
+    sources:
+      - config                                                # [OPTIONAL] Restrict to the 'config' source above (otherwise all sources).
+
+  # Example: Push secrets from 1Password into SSM as SecureStrings.
+  - type: ssm
+    options:
+      prefix: '/env/{{ ENVIRONMENT_NAME }}/secret/'
+      overwrite: true
+      type: SecureString
+    sources:
+      - 1password                                             # Only read items produced by the '1password' source.
+
+  # Example: Mirror the same 1Password secrets into AWS Secrets Manager.
+  - type: secrets_manager                                     # [REQUIRED] Use AWS Secrets Manager sink.
+    options:
+      prefix: '/env/{{ ENVIRONMENT_NAME }}/secret/'           # [OPTIONAL] Prefix for secret names.
+    sources:
+      - 1password
