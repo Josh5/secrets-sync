@@ -20,3 +20,7 @@ secrets.yaml
 # Local dev env
 /temp
 /tmp
+
+# Build files
+/dist
+/build

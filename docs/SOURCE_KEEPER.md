@@ -90,7 +90,7 @@ When `tag_filters` is provided in the secrets-sync config, a record qualifies if
 
 Record types `Login`, `General`, and `Secure Note` are supported.
 
-> [!NOTE] Additional Info
+> [!NOTE]
 > The source prefers the record-level password, then any password/login/note fields, then any other custom fields (excluding the `tags` helper), and finally the record notes body.
 
 ## Configuring the Keeper source
