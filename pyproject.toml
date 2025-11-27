@@ -8,9 +8,9 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "boto3>=1.26",
+  "boto3>=1.41",
   "PyYAML>=6.0",
-  "keepercommander>=16.8.0"
+  "keepercommander>=17.1"
 ]
 
 [build-system]
