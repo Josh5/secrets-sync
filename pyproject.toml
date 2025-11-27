@@ -1,6 +1,6 @@
 [project]
 name = "secrets-sync"
-version = "0.1.0"
+version = "0.1.1"
 description = "Commandline tool to pull secrets from multiple sources and push to AWS SSM and Secrets Manager with rate limiting."
 authors = [
   { name = "Josh.5" }
@@ -20,8 +20,9 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["secrets_sync"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["secrets_sync*"]
 
 [project.scripts]
 secrets-sync = "secrets_sync.cli:main"
