@@ -59,7 +59,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `1password`: Fetches items from a 1Password vault and maps each item title to a secret. Requires the 1Password `op` CLI to be installed plus either a configured `service_account_token` or the `OP_SERVICE_ACCOUNT_TOKEN` environment variable for authentication. Full walkthrough: [docs/SOURCE_1PASSWORD.md](docs/SOURCE_1PASSWORD.md).
 
   - `vault`: Vault name (required).
-  - `tag_filters`: Only items containing any of these tags are included.
+  - `tag_filters`: Only items containing any of these tags are included. The list order also determines override priority when multiple items share the same title.
   - `include_regex`: Optional regex applied to item titles for additional filtering.
   - `service_account_token`: Inline token value; falls back to the `OP_SERVICE_ACCOUNT_TOKEN` environment variable when omitted.
   - `concurrency`: Number of parallel fetches when pulling item details (default `8`).
@@ -67,7 +67,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `keeper`: Uses the Keeper Commander SDK/CLI session to pull records from Keeper Enterprise. Requires a logged-in Keeper Commander environment with persistent login or inline credentials. Reference guide: [docs/SOURCE_KEEPER.md](docs/SOURCE_KEEPER.md).
 
   - `folder`: Keeper folder or path to read from (required).
-  - `tag_filters`: Only records whose custom `tags` field matches any supplied tag are included.
+  - `tag_filters`: Only records whose custom `tags` field matches any supplied tag are included. The list order also determines override priority when multiple items share the same title.
   - `include_regex`: Optional regex applied to record titles.
   - `config_file`: Path to the Keeper Commander config (default `~/.keeper/config.json`).
   - `keeper_server`, `keeper_user`, `keeper_password`: Inline overrides (or `KEEPER_SERVER`, `KEEPER_USER`, `KEEPER_PASSWORD` env vars) for CLI login values. Overrides what is read from `config_file`.

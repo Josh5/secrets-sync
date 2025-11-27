@@ -8,7 +8,7 @@ import subprocess
 from typing import Dict, List, Optional
 
 from ..models import SecretItem, SourceConfig
-from .base import BaseSource
+from .base import BaseSource, SecretCandidate
 
 
 class OnePasswordSource(BaseSource):
@@ -28,7 +28,8 @@ class OnePasswordSource(BaseSource):
         self.vault: str = o.get("vault") or ""
         if not self.vault:
             raise ValueError("1Password source requires 'vault' option")
-        self.tag_filters: List[str] = [str(x) for x in (o.get("tag_filters") or [])]
+        self.tag_filters: List[str] = self._normalize_tag_list(o.get("tag_filters") or [])
+        self._tag_filter_set = set(self.tag_filters)
         self.include_re: Optional[re.Pattern[str]] = None
         if o.get("include_regex"):
             self.include_re = re.compile(str(o.get("include_regex")))
@@ -51,8 +52,8 @@ class OnePasswordSource(BaseSource):
         items: List[dict] = []
         for it in data:
             title = it.get("title", "")
-            tags = it.get("tags") or []
-            if self.tag_filters and not any(t in tags for t in self.tag_filters):
+            tags = self._normalize_tag_list(it.get("tags") or [])
+            if self.tag_filters and not any(tag in self._tag_filter_set for tag in tags):
                 continue
             if self.include_re and not self.include_re.search(title):
                 continue
@@ -82,17 +83,19 @@ class OnePasswordSource(BaseSource):
         items = await asyncio.to_thread(self._list_items)
 
         sem = asyncio.Semaphore(self.concurrency)
-        results: Dict[str, SecretItem] = {}
+        candidates: List[SecretCandidate] = []
 
-        async def fetch_one(it: dict) -> None:
+        async def fetch_one(it: dict) -> Optional[SecretCandidate]:
             async with sem:
                 detail = await asyncio.to_thread(self._get_item_detail, it.get("id"))
                 title = detail.get("title") or it.get("title")
                 value = self._extract_value(detail)
                 if title and value is not None:
-                    results[str(title)] = SecretItem(
-                        name=str(title), value=str(value), source=self.config.name
-                    )
+                    tags = self._normalize_tag_list(detail.get("tags") or it.get("tags") or [])
+                    return SecretCandidate(name=str(title), value=str(value), tags=tags)
+                return None
 
-        await asyncio.gather(*(fetch_one(it) for it in items))
-        return results
+        for candidate in await asyncio.gather(*(fetch_one(it) for it in items)):
+            if candidate:
+                candidates.append(candidate)
+        return self._select_candidate_values(candidates, self.tag_filters)

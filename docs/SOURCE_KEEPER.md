@@ -93,6 +93,22 @@ Record types `Login`, `General`, and `Secure Note` are supported.
 > [!NOTE]
 > The source prefers the record-level password, then any password/login/note fields, then any other custom fields (excluding the `tags` helper), and finally the record notes body.
 
+### Tag filters and overrides
+
+When you configure `tag_filters`, the source keeps items whose tags match **any** of the supplied values, but it also uses the order of that list to break ties between items that share the same title. Later entries have higher priority. For example, with:
+
+```
+tag_filters:
+  - default
+  - staging
+  - test-3
+```
+
+`test-3` overrides `staging`, which overrides `default`.
+
+> [!NOTE]
+> If two items share the same title and the same highest-priority tag (e.g., two `APP_KEY` entries both tagged `test-3`), the last one wins and the CLI logs a warning so you can fix the duplicate in Keeper.
+
 ## Configuring the Keeper source
 
 ```

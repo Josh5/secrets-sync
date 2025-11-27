@@ -66,6 +66,22 @@ Example items in `EnvironmentSecrets`:
 
 This keeps defaults explicit and reduces duplication.
 
+### Tag filters and overrides
+
+When you configure `tag_filters`, the source keeps items whose tags match **any** of the supplied values, but it also uses the order of that list to break ties between items that share the same title. Later entries have higher priority. For example, with:
+
+```
+tag_filters:
+  - default
+  - staging
+  - test-3
+```
+
+`test-3` overrides `staging`, which overrides `default`.
+
+> [!NOTE]
+> If two items share the same title and the same highest-priority tag (e.g., two `APP_KEY` entries both tagged `test-3`), the last one wins and the CLI logs a warning so you can fix the duplicate in 1Password.
+
 ## Configure the 1Password source
 
 In your config, add a source of type `1password`, specifying the vault and the tags you want to include. Typically you include `default` and the environment tag so that environment-specific items override the defaults by title.
@@ -136,4 +152,3 @@ secrets-sync \
 ```
 
 This prints a preview of what would be pushed, grouped by sink, including any configured prefixes.
-

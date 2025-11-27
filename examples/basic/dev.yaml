@@ -30,6 +30,8 @@ sources:
       vault: 'EnvironmentSecrets'                             # [REQUIRED] Vault name to read from.
       include_regex: '^APP_.*'                                # [OPTIONAL] Only include items whose title matches this regex.
       tag_filters:                                            # [OPTIONAL] Any matching tag qualifies an item for inclusion.
+        # Tag order defines override priority when multiple items share the same title;
+        # later entries (e.g., test-1) win over earlier ones (e.g., default).
         - default
         - test-1
 

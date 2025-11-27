@@ -6,16 +6,11 @@ import re
 from collections.abc import Sequence
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
-try:
-    from keepercommander.__main__ import get_params_from_config
-    from keepercommander import api
-except ImportError as exc:  # pragma: no cover - optional dependency
-    raise RuntimeError(
-        "Keeper source requires the 'keepercommander' package. Install it with `pip install keepercommander`."
-    ) from exc
+from keepercommander.__main__ import get_params_from_config
+from keepercommander import api
 
 from ..models import SecretItem, SourceConfig
-from .base import BaseSource
+from .base import BaseSource, SecretCandidate
 
 
 class KeeperSource(BaseSource):
@@ -37,8 +32,8 @@ class KeeperSource(BaseSource):
         self.folder: str = str(o.get("folder") or "").strip()
         if not self.folder:
             raise ValueError("Keeper source requires 'folder' option")
-        tag_filters = o.get("tag_filters") or []
-        self.tag_filters: Set[str] = {str(x).strip() for x in tag_filters if str(x).strip()}
+        self.tag_filters: List[str] = self._normalize_tag_list(o.get("tag_filters") or [])
+        self._tag_filter_set: Set[str] = set(self.tag_filters)
         include_regex = str(o.get("include_regex") or "").strip()
         self.include_re: Optional[re.Pattern[str]] = re.compile(include_regex) if include_regex else None
         config_path = o.get("config_file") or "~/.keeper/config.json"
@@ -69,7 +64,7 @@ class KeeperSource(BaseSource):
     def _fetch_record(self, params, uid: str) -> Optional[dict]:
         try:
             record_obj = api.get_record(params, uid)
-        except Exception as exc:  # pragma: no cover - SDK specific errors
+        except Exception as exc:
             raise RuntimeError(f"Failed to fetch Keeper record {uid}: {exc}") from exc
         if not record_obj:
             return None
@@ -94,7 +89,7 @@ class KeeperSource(BaseSource):
             params.password = self.keeper_password
         try:
             api.login(params)
-        except Exception as exc:  # pragma: no cover - SDK raises its own errors
+        except Exception as exc:
             raise RuntimeError(
                 "Failed to login to Keeper; refresh persistent login via `keeper shell`."
             ) from exc
@@ -157,7 +152,7 @@ class KeeperSource(BaseSource):
             tags: List[str] = []
             for candidate in self._expand_field_values(field.get("value")):
                 tags.extend(self._split_and_strip(candidate))
-            return tags
+            return self._normalize_tag_list(tags)
         return []
 
     def _record_title(self, record: dict) -> str:
@@ -180,8 +175,10 @@ class KeeperSource(BaseSource):
         return None
 
     def _tags_match(self, record_tags: List[str]) -> bool:
-        normalized = {tag.strip() for tag in record_tags if tag}
-        return bool(normalized & self.tag_filters)
+        if not self._tag_filter_set:
+            return True
+        normalized = {tag for tag in record_tags if tag}
+        return bool(normalized & self._tag_filter_set)
 
     def _custom_entries(self, record: dict) -> Iterable[dict]:
         for entry in self._field_entries(record, ("custom_fields", "custom")):
@@ -227,7 +224,7 @@ class KeeperSource(BaseSource):
 
     async def pull(self) -> Dict[str, SecretItem]:
         records = await asyncio.to_thread(self._collect_records)
-        results: Dict[str, SecretItem] = {}
+        candidates: List[SecretCandidate] = []
 
         for detail in records:
             title = self._record_title(detail)
@@ -241,6 +238,6 @@ class KeeperSource(BaseSource):
             value = self._extract_value(detail)
             if value is None:
                 continue
-            results[title] = SecretItem(name=title, value=str(value), source=self.config.name)
+            candidates.append(SecretCandidate(name=title, value=str(value), tags=tags))
 
-        return results
+        return self._select_candidate_values(candidates, self.tag_filters)
