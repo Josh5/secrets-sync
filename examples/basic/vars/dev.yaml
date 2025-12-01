@@ -5,3 +5,13 @@ values:
   - name: ANOTHER_SOMETHING
     value: 'true' # Overrides the 'false' default defined in vars/default.yaml.
     description: 'Something that has been set to be false by default.'
+
+  # Example lookup: pull a PEM directly from a sibling file using ENVIRONMENT_NAME.
+  - name: TLS_CERT_PEM
+    value: "{{ lookup('file', './files/{}-cert.pem'.format(ENVIRONMENT_NAME)) }}"
+    description: 'Populated from vars/files/dev-cert.pem via lookup().'
+
+  # Example filters: read JSON metadata, parse, and emit normalized JSON.
+  - name: TLS_CERT_METADATA
+    value: "{{ lookup('file', './files/{}-metadata.json'.format(ENVIRONMENT_NAME)) | from_json | to_json }}"
+    description: 'Demonstrates from_json/to_json filters on lookup output.'

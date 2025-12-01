@@ -20,6 +20,7 @@ class BaseSource:
         # Backward compat: if no name provided, use type
         if not getattr(self.config, "name", None):
             self.config.name = self.config.type
+        self.vars = dict(getattr(self.config, "vars", {}) or {})
         self.logger = logging.getLogger(f"{self.__class__.__module__}.{self.__class__.__name__}")
 
     async def pull(self) -> Dict[str, SecretItem]:

@@ -128,6 +128,7 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
                 name=s.get("name"),
                 type=s.get("type"),
                 options=s.get("options", {}) or {},
+                vars=dict(vars_map),
             )
         )
 

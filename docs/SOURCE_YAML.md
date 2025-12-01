@@ -20,6 +20,27 @@ sources:
 
 The `files` paths are resolved relative to the config file that declares the source, not the current working directory. This makes nested includes predictable no matter where you run the command from.
 
+### Lookup helper
+
+Values can embed simple Jinja expressions that call `lookup('file', path)`—similar to Ansible—to inline the contents of another file. Paths are resolved relative to the YAML file currently being processed, so you can keep certificate snippets or other large blobs next to the value file:
+
+```yaml
+values:
+  - name: TLS_CERT_PEM
+    value: "{{ lookup('file', './files/{}-cert.pem'.format(ENVIRONMENT_NAME)) }}"
+    description: "Populated from vars/files/dev-cert.pem via lookup()."
+```
+
+Filters `from_json` and `to_json` are also available so you can parse JSON blobs from disk, manipulate them, and re-emit normalized JSON:
+
+```yaml
+values:
+  - name: TLS_CERT_METADATA
+    value: "{{ lookup('file', './files/{}-metadata.json'.format(ENVIRONMENT_NAME)) | from_json | to_json }}"
+```
+
+Lookup templates receive the merged config `vars` and all environment variables, so the example above works without exporting `ENVIRONMENT_NAME` separately. Unsupported lookup plugins raise an error, and missing files stop the sync early so issues are caught before pushing to sinks.
+
 ## Supported data shapes
 
 Any of the following structures produce the same output:

@@ -19,6 +19,7 @@ class SourceConfig:
     type: str
     name: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
+    vars: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

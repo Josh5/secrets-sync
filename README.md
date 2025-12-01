@@ -174,3 +174,4 @@ sinks:
 
 - Lists of dicts with `name` fields are deep-merged by name across config files (later files override earlier entries). Other lists are replaced.
 - YAML source `files` are resolved relative to the config file they are declared in.
+- YAML source values can call `{{ lookup('file', 'relative/path') }}` to inline file contents. Lookup templates receive the merged config `vars` plus environment variables, and relative paths are evaluated from the YAML file that declares the secret. You can chain Ansible-style filters such as `| from_json | to_json` to parse and re-emit structured data.

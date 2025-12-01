@@ -1,0 +1,5 @@
+{
+    "env": "dev",
+    "issued_to": "example-service",
+    "expires_on": "2030-01-01"
+}
