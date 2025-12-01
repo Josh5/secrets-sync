@@ -110,6 +110,7 @@ class SsmSink(BaseSink):
                 Type=self.param_type,
                 Overwrite=self.overwrite,
             )
+            size_bytes = len(item.value.encode("utf-8"))
             tier = self._determine_parameter_tier(name, item.value)
             kwargs["Tier"] = tier
             if self.kms_key_id:
@@ -118,11 +119,42 @@ class SsmSink(BaseSink):
                 kwargs["Description"] = item.description
             # Run boto3 call with retries
 
-            async def do_call():
-                await asyncio.to_thread(self.client.put_parameter, **kwargs)
-
             try:
-                await retry_aws(do_call)
+
+                async def do_call():
+                    await asyncio.to_thread(self.client.put_parameter, **kwargs)
+
+                # If AWS rejects the write with "advanced-parameter tier" (meaning the existing parameter is already
+                # Advanced even though we sized it as Standard), retry once forcing Tier="Advanced" instead of
+                # bubbling the downgrade ValidationException.
+                attempted_advanced = tier == "Advanced"
+                while True:
+                    try:
+                        await retry_aws(do_call)
+                        break
+                    except self.client.exceptions.ValidationException as exc:
+                        message = str(exc)
+                        if (
+                            not attempted_advanced
+                            and "advanced-parameter tier" in message.lower()
+                        ):
+                            logger.warning(
+                                (
+                                    "SSM parameter %s already exists as an Advanced parameter; "
+                                    "value is %d bytes (<= %d Standard limit) so "
+                                    "secrets-sync first attempted Standard. Retrying "
+                                    "with Tier='Advanced'. If you intended it to be a "
+                                    "Standard parameter, delete the parameter in SSM and rerun "
+                                    "secrets-sync to recreate it as a Standard parameter."
+                                ),
+                                name,
+                                size_bytes,
+                                STANDARD_TIER_MAX_BYTES,
+                            )
+                            kwargs["Tier"] = "Advanced"
+                            attempted_advanced = True
+                            continue
+                        raise
             except Exception as exc:
                 if self.detail_logging_enabled:
                     self.log_sync_failure(
