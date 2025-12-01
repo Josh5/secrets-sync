@@ -4,6 +4,7 @@ import logging
 from typing import Iterable, Optional
 
 from ..models import SecretItem, SinkConfig
+from ..utils.logging import LevelColorFormatter, bcolours
 
 _detail_logger = logging.getLogger("secrets_sync.sync_details")
 
@@ -42,6 +43,7 @@ class BaseSink:
         if not self._print_sync_details:
             return
         detail = self._format_action_detail(action, old_value, new_value)
+        detail = self._apply_action_colour(detail, action, level=logging.INFO)
         _detail_logger.info("[%s] %s -> succeeded (%s)", self.sink_label, item_name, detail)
 
     def log_sync_failure(
@@ -56,6 +58,7 @@ class BaseSink:
         if not self._print_sync_details:
             return
         detail = self._format_action_detail(action, old_value, new_value)
+        detail = self._apply_action_colour(detail, action, level=logging.ERROR)
         if error:
             _detail_logger.error(
                 "[%s] %s -> failed (%s): %s", self.sink_label, item_name, detail, error
@@ -71,6 +74,7 @@ class BaseSink:
     ) -> str:
         if not self._detail_value_snapshots:
             return action
+
         def _fmt(value: Optional[str]) -> str:
             if value is None:
                 return "''"
@@ -82,6 +86,25 @@ class BaseSink:
         if action in ("updated", "changed"):
             return f"changed {_fmt(old_value)} -> {_fmt(new_value)}"
         return action
+
+    def _log_level_colour(self, level: int) -> str:
+        return LevelColorFormatter.COLOR_MAP.get(level, bcolours.HIGHINTENSITYWHITE)
+
+    def _action_colour(self, action: str) -> Optional[str]:
+        if action == "created":
+            return bcolours.OKGREEN
+        if action in ("updated", "changed"):
+            return bcolours.WARNING
+        return None
+
+    def _apply_action_colour(self, detail: str, action: str, *, level: int) -> str:
+        action_colour = self._action_colour(action)
+        if not action_colour:
+            return detail
+        base_colour = self._log_level_colour(level)
+        if detail.startswith(action):
+            return f"{action_colour}{action}{base_colour}{detail[len(action):]}"
+        return detail.replace(action, f"{action_colour}{action}{base_colour}", 1)
 
 
 def build_sink(
