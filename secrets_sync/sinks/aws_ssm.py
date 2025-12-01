@@ -13,6 +13,9 @@ from ..utils.retry import retry_aws
 
 logger = logging.getLogger(__name__)
 
+STANDARD_TIER_MAX_BYTES = 4 * 1024
+ADVANCED_TIER_MAX_BYTES = 8 * 1024
+
 
 class SsmSink(BaseSink):
     def __init__(
@@ -34,6 +37,7 @@ class SsmSink(BaseSink):
         self.param_type: str = str(o.get("type", "SecureString"))
         if self.param_type not in ("SecureString", "String"):
             raise ValueError("SSM 'type' must be 'SecureString' or 'String'")
+        self._default_tier = self._normalize_tier(o.get("tier"))
         self.kms_key_id = o.get("kms_key_id")
         self.rate_limit_rps = float(o.get("rate_limit_rps", 10))
         self.concurrency = int(o.get("concurrency", 10))
@@ -58,6 +62,32 @@ class SsmSink(BaseSink):
         except self.client.exceptions.ParameterNotFound:
             return False, None
 
+    def _normalize_tier(self, tier_option: Optional[str]) -> str:
+        if not tier_option:
+            return "Standard"
+        normalized = str(tier_option).strip().lower()
+        if normalized not in ("standard", "advanced"):
+            raise ValueError("SSM 'tier' must be 'Standard' or 'Advanced'")
+        return "Standard" if normalized == "standard" else "Advanced"
+
+    def _determine_parameter_tier(self, param_name: str, value: str) -> str:
+        size_bytes = len(value.encode("utf-8"))
+        if size_bytes > ADVANCED_TIER_MAX_BYTES:
+            raise ValueError(
+                f"Parameter '{param_name}' is {size_bytes} bytes which exceeds the "
+                f"SSM Advanced tier limit ({ADVANCED_TIER_MAX_BYTES} bytes)"
+            )
+        if size_bytes > STANDARD_TIER_MAX_BYTES:
+            if self._default_tier == "Standard":
+                logger.warning(
+                    "SSM parameter %s is %d bytes (> %d); automatically using Advanced tier",
+                    param_name,
+                    size_bytes,
+                    STANDARD_TIER_MAX_BYTES,
+                )
+            return "Advanced"
+        return self._default_tier
+
     def _classify_action(self, existed: bool, old_value: Optional[str], new_value: str) -> str:
         if not existed:
             return "created"
@@ -80,6 +110,8 @@ class SsmSink(BaseSink):
                 Type=self.param_type,
                 Overwrite=self.overwrite,
             )
+            tier = self._determine_parameter_tier(name, item.value)
+            kwargs["Tier"] = tier
             if self.kms_key_id:
                 kwargs["KeyId"] = self.kms_key_id
             if item.description:

@@ -78,6 +78,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 
   - `prefix`: optional string prefix for parameter names (supports `{{ VAR }}` placeholders)
   - `type`: `SecureString` (default) or `String` (any other value errors at load time)
+  - `tier`: `Standard` (default) or `Advanced`. Values over 4 KB (measured after UTF-8 encoding) are automatically promoted to the Advanced tier with a warning so large file-style secrets can be stored without changing the source config. Note: Values over 8 KB will fail with an error.
   - `overwrite`: boolean (default true)
   - `kms_key_id`: optional KMS key id for SecureString
   - `rate_limit_rps`, `concurrency`: control throughput
