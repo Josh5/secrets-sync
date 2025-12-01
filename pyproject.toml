@@ -1,6 +1,6 @@
 [project]
 name = "secrets-sync"
-version = "0.2.0"
+version = "0.3.0"
 description = "Commandline tool to pull secrets from multiple sources and push to AWS SSM and Secrets Manager with rate limiting."
 authors = [
   { name = "Josh.5" }
