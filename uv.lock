@@ -1354,10 +1354,11 @@ wheels = [
 
 [[package]]
 name = "secrets-sync"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "jinja2" },
     { name = "keepercommander" },
     { name = "pyyaml" },
 ]
@@ -1365,6 +1366,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.41" },
+    { name = "jinja2", specifier = ">=3.1" },
     { name = "keepercommander", specifier = ">=17.1" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
