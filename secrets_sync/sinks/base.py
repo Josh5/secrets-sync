@@ -19,7 +19,9 @@ class BaseSink:
     ):
         self.config = config
         self._print_sync_details = print_sync_details
-        self._detail_value_snapshots = bool(print_sync_details and detail_value_snapshots)
+        self._detail_value_snapshots = bool(
+            print_sync_details and detail_value_snapshots
+        )
 
     async def push_many(self, items: Iterable[SecretItem]) -> None:
         raise NotImplementedError
@@ -44,7 +46,9 @@ class BaseSink:
             return
         detail = self._format_action_detail(action, old_value, new_value)
         detail = self._apply_action_colour(detail, action, level=logging.INFO)
-        _detail_logger.info("[%s] %s -> succeeded (%s)", self.sink_label, item_name, detail)
+        _detail_logger.info(
+            "[%s] %s -> succeeded (%s)", self.sink_label, item_name, detail
+        )
 
     def log_sync_failure(
         self,
@@ -64,7 +68,9 @@ class BaseSink:
                 "[%s] %s -> failed (%s): %s", self.sink_label, item_name, detail, error
             )
         else:
-            _detail_logger.error("[%s] %s -> failed (%s)", self.sink_label, item_name, detail)
+            _detail_logger.error(
+                "[%s] %s -> failed (%s)", self.sink_label, item_name, detail
+            )
 
     def _format_action_detail(
         self,
@@ -79,6 +85,7 @@ class BaseSink:
             if value is None:
                 return "''"
             return repr(value)
+
         if action == "created":
             return f"{action} {_fmt(new_value)}"
         if action == "unchanged":
@@ -103,7 +110,7 @@ class BaseSink:
             return detail
         base_colour = self._log_level_colour(level)
         if detail.startswith(action):
-            return f"{action_colour}{action}{base_colour}{detail[len(action):]}"
+            return f"{action_colour}{action}{base_colour}{detail[len(action) :]}"
         return detail.replace(action, f"{action_colour}{action}{base_colour}", 1)
 
 
@@ -134,6 +141,14 @@ def build_sink(
         from .infisical import InfisicalSink
 
         return InfisicalSink(
+            cfg,
+            print_sync_details=print_sync_details,
+            detail_value_snapshots=detail_value_snapshots,
+        )
+    if t == "dotenv":
+        from .dotenv import DotenvSink
+
+        return DotenvSink(
             cfg,
             print_sync_details=print_sync_details,
             detail_value_snapshots=detail_value_snapshots,

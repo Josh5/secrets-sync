@@ -95,6 +95,30 @@ def _prefixed_name(sink_cfg, item: SecretItem) -> str:
         if path == "/":
             return f"/{secret_name}"
         return f"{path.rstrip('/')}/{secret_name}"
+    if t == "dotenv":
+        strip_prefixes = opts.get("strip_prefixes")
+        if strip_prefixes is None:
+            strip_prefixes = opts.get("strip_prefix")
+        if strip_prefixes is None:
+            prefixes = []
+        elif isinstance(strip_prefixes, list):
+            prefixes = [str(value) for value in strip_prefixes]
+        else:
+            prefixes = [str(strip_prefixes)]
+
+        name = item.name
+        for prefix in prefixes:
+            if prefix and name.startswith(prefix):
+                name = name[len(prefix):]
+
+        key_case = str(opts.get("key_case") or "").strip().lower()
+        force_upper = bool(opts.get("force_uppercase", False))
+        force_lower = bool(opts.get("force_lowercase", False))
+        if key_case == "upper" or force_upper:
+            name = name.upper()
+        elif key_case == "lower" or force_lower:
+            name = name.lower()
+        return name
     return item.name
 
 
@@ -135,6 +159,13 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
             name_prefix = opts.get("name_prefix") or opts.get("prefix") or ""
             if name_prefix:
                 header_details.append(f"name_prefix='{name_prefix}'")
+        elif t == "dotenv":
+            path = opts.get("path") or opts.get("file") or ""
+            if path:
+                header_details.append(f"path='{path}'")
+            key_case = opts.get("key_case")
+            if key_case:
+                header_details.append(f"key_case='{key_case}'")
         if sources:
             header_details.append(f"sources={','.join(sources)}")
         header = f"--- Sink: {name} [{t}]"
@@ -181,6 +212,8 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
                 prefix = opts.get("prefix") or ""
             elif t == "infisical":
                 prefix = opts.get("secret_path") or opts.get("path") or "/"
+            elif t == "dotenv":
+                prefix = opts.get("path") or opts.get("file") or ""
             selected = [i for i in items.values() if not sources or i.source in sources]
             items_list = [
                 {

@@ -50,6 +50,7 @@ def _interpolate(obj: Any, vars_map: Dict[str, str]) -> Any:
     Raises ValueError if a placeholder has no value.
     """
     if isinstance(obj, str):
+
         def replace(match: re.Match[str]) -> str:
             key = match.group(1)
             if key not in vars_map or vars_map[key] is None:
@@ -93,10 +94,34 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
                     resolved = []
                     for fp in files:
                         if isinstance(fp, str) and not os.path.isabs(fp):
-                            resolved.append(os.path.normpath(os.path.join(base_dir, fp)))
+                            resolved.append(
+                                os.path.normpath(os.path.join(base_dir, fp))
+                            )
                         else:
                             resolved.append(fp)
                     opts["files"] = resolved
+                    if "file" in opts:
+                        del opts["file"]
+
+        sink_list = data.get("sinks")
+        if isinstance(sink_list, list):
+            for sink in sink_list:
+                if not isinstance(sink, dict):
+                    continue
+                t = (sink.get("type") or "").lower()
+                if t != "dotenv":
+                    continue
+                opts = sink.get("options")
+                if not isinstance(opts, dict):
+                    continue
+                raw_path = opts.get("path") or opts.get("file")
+                if (
+                    isinstance(raw_path, str)
+                    and raw_path
+                    and not os.path.isabs(raw_path)
+                ):
+                    resolved = os.path.normpath(os.path.join(base_dir, raw_path))
+                    opts["path"] = resolved
                     if "file" in opts:
                         del opts["file"]
 
@@ -114,7 +139,9 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
 
     aws_data = merged.get("aws", {}) or {}
     aws = AwsConfig(
-        region=aws_data.get("region") or os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION"),
+        region=aws_data.get("region")
+        or os.getenv("AWS_DEFAULT_REGION")
+        or os.getenv("AWS_REGION"),
         profile=aws_data.get("profile") or os.getenv("AWS_PROFILE"),
     )
 
@@ -133,7 +160,9 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
         )
 
     # Validate sink routing references existing source names
-    valid_source_names = {(rs.get("name") or rs.get("type")) for rs in raw_sources if isinstance(rs, dict)}
+    valid_source_names = {
+        (rs.get("name") or rs.get("type")) for rs in raw_sources if isinstance(rs, dict)
+    }
 
     sinks = []
     for s in _coerce_list(merged.get("sinks")):
@@ -143,7 +172,9 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
         for ref in src_filter:
             if ref not in valid_source_names:
                 sink_label = s.get("name") or s.get("type") or "<unnamed-sink>"
-                raise ValueError(f"Sink '{sink_label}' references unknown source '{ref}'")
+                raise ValueError(
+                    f"Sink '{sink_label}' references unknown source '{ref}'"
+                )
         sinks.append(
             SinkConfig(
                 name=s.get("name"),
@@ -153,4 +184,9 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
             )
         )
 
-    return AppConfig(aws=aws, sources=sources, sinks=sinks, vars={k: str(v) for k, v in vars_map.items()})
+    return AppConfig(
+        aws=aws,
+        sources=sources,
+        sinks=sinks,
+        vars={k: str(v) for k, v in vars_map.items()},
+    )

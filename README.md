@@ -15,6 +15,7 @@ and push them to:
 - AWS SSM Parameter Store
 - AWS Secrets Manager
 - Infisical
+- dotenv files
 
 ## Install
 
@@ -34,6 +35,20 @@ To setup a local dev env, use [`uv`](https://docs.astral.sh/uv/getting-started/i
 uv venv && uv pip install --editable .
 
 source .venv/bin/activate
+```
+
+To bump the package version, use `uv version`:
+
+```bash
+uv version --bump patch
+uv version --bump minor
+uv version --bump major
+```
+
+Or set an explicit version:
+
+```bash
+uv version 0.7.0
 ```
 
 After changing dependencies in `pyproject.toml`, refresh `uv.lock`:
@@ -132,6 +147,13 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `auth_method`: optional `token` or `universal_auth`.
   - Authentication is environment-only via `INFISICAL_TOKEN` or `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
   - `rate_limit_rps`, `concurrency`: control throughput.
+
+- `dotenv`: Writes the selected items into a local dotenv file. Detailed behavior and examples are in [docs/SINK_DOTENV.md](docs/SINK_DOTENV.md).
+  - `path`: required target dotenv file path. Relative paths are resolved against the config file where they are declared.
+  - `mode`: optional `merge` (default) or `replace`. `merge` updates matching keys and appends missing ones while preserving unrelated existing entries. `replace` rewrites the file from only the selected sink items.
+  - `key_case`: optional `preserve` (default), `upper`, or `lower`.
+  - `strip_prefix` or `strip_prefixes`: optional prefix or list of prefixes removed from the start of each secret name before writing.
+  - In `merge` mode, the sink behaves like the remote sinks: it updates matching keys and creates missing ones without deleting unrelated dotenv entries.
 
 The AWS API usage for both AWS sinks are paced automatically: the sinks meter requests so they stay within the configured `rate_limit_rps`, and they fall back to exponential backoff with jitter whenever AWS responds with throttling errors.
 
@@ -235,6 +257,13 @@ sinks:
       secret_path: '/secrets'
       auth_method: universal_auth
     sources: [ '1password' ]
+  - name: app-dotenv
+    type: dotenv
+    options:
+      path: './out/.env'
+      key_case: upper
+      strip_prefix: 'APP_'
+    sources: [ 'infisical' ]
 ```
 
 ### Requirements
@@ -249,4 +278,5 @@ sinks:
 
 - Lists of dicts with `name` fields are deep-merged by name across config files (later files override earlier entries). Other lists are replaced.
 - YAML source `files` are resolved relative to the config file they are declared in.
+- Dotenv sink `path` values are resolved relative to the config file they are declared in.
 - YAML source values can call `{{ lookup('file', 'relative/path') }}` to inline file contents. Lookup templates receive the merged config `vars` plus environment variables, and relative paths are evaluated from the YAML file that declares the secret. You can chain Ansible-style filters such as `| from_json | to_json` to parse and re-emit structured data.
