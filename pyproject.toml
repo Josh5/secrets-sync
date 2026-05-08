@@ -1,12 +1,13 @@
 [project]
 name = "secrets-sync"
-version = "0.5.2"
+version = "0.6.0"
 description = "Commandline tool to pull secrets from multiple sources and push to AWS SSM and Secrets Manager with rate limiting."
 authors = [
   { name = "Josh.5" }
 ]
 readme = "README.md"
 requires-python = ">=3.10"
+# After changing dependencies, refresh uv.lock with: uv lock
 dependencies = [
   "boto3>=1.41",
   "PyYAML>=6.0",

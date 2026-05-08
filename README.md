@@ -20,10 +20,26 @@ and push them to:
 
 Requires Python 3.10+.
 
+Install from PyPI:
+
+```bash
+pip install secrets-sync
+```
+
+## Develop
+
+To setup a local dev env, use [`uv`](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer)
+
 ```
 uv venv && uv pip install --editable .
 
 source .venv/bin/activate
+```
+
+After changing dependencies in `pyproject.toml`, refresh `uv.lock`:
+
+```bash
+uv lock
 ```
 
 ## Usage

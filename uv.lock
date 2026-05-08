@@ -3,6 +3,15 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
+name = "aenum"
+version = "3.1.17"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/e9/8b283567c1fef7c24d1f390b37daede8b61593d8cdaffb8e95d571699e83/aenum-3.1.17.tar.gz", hash = "sha256:a969a4516b194895de72c875ece355f17c0d272146f7fda346ef74f93cf4d5ba", size = 137648, upload-time = "2026-03-20T20:43:29.846Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/8d/1fe30c6fd8999b9d462547c4a1bb6690bda24af38f2913c4bec7decb81f2/aenum-3.1.17-py3-none-any.whl", hash = "sha256:8b883a37a04e74cc838ac442bdd28c266eae5bbf13e1342c7ef123ed25230139", size = 165560, upload-time = "2026-03-20T20:43:27.681Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -565,6 +574,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/b0/36bd937216ec521246249be3bf9855081de4c5e06a0c9b4219dbeda50373/importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd", size = 27656, upload-time = "2025-04-27T15:29:00.214Z" },
+]
+
+[[package]]
+name = "infisicalsdk"
+version = "1.0.16"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aenum" },
+    { name = "boto3" },
+    { name = "botocore" },
+    { name = "python-dateutil" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/36/1e8650cbdcdec755c85ca0293956b25efb7d4371f54b20ec53e35ab0502f/infisicalsdk-1.0.16.tar.gz", hash = "sha256:7518446a60418d46c7926f10447f28c9e24d7b25ba25885d9bae428297d32694", size = 17254, upload-time = "2026-02-18T17:41:34.747Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/16/797b84fa77b24a3a59288c0698d11fee59ba9e8e51b2a26a20feba03ae13/infisicalsdk-1.0.16-py3-none-any.whl", hash = "sha256:3e3f5f377f8c3017af7702ef3b1dfc5b4668f98936bb0e471f859e07abda0194", size = 21758, upload-time = "2026-02-18T17:41:33.41Z" },
 ]
 
 [[package]]
@@ -1354,21 +1379,25 @@ wheels = [
 
 [[package]]
 name = "secrets-sync"
-version = "0.5.2"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "infisicalsdk" },
     { name = "jinja2" },
     { name = "keepercommander" },
     { name = "pyyaml" },
+    { name = "requests" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.41" },
+    { name = "infisicalsdk", specifier = ">=1.0.3" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "keepercommander", specifier = ">=17.1" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "requests", specifier = ">=2.31" },
 ]
 
 [[package]]
