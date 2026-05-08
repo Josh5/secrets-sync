@@ -92,4 +92,8 @@ def build_source(cfg: SourceConfig) -> BaseSource:
         from .keeper import KeeperSource
 
         return KeeperSource(cfg)
+    if t in ("infisical",):
+        from .infisical import InfisicalSource
+
+        return InfisicalSource(cfg)
     raise ValueError(f"Unknown source type: {cfg.type}")

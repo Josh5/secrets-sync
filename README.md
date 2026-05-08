@@ -3,12 +3,15 @@
 ## Description
 
 Async CLI to pull secrets from:
+
 - environment variables
 - YAML files
+- Infisical
 - 1Password vaults
 - Keeper folders
 
 and push them to:
+
 - AWS SSM Parameter Store
 - AWS Secrets Manager
 - Infisical
@@ -71,6 +74,17 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `include_regex`: Optional regex applied to item titles for additional filtering.
   - `service_account_token`: Inline token value; falls back to the `OP_SERVICE_ACCOUNT_TOKEN` environment variable when omitted.
   - `concurrency`: Number of parallel fetches when pulling item details (default `8`).
+
+- `infisical`: Reads secrets from an Infisical project, environment, and folder path. Detailed setup, auth, slug lookup, `secret_path`, and recursive read behavior are documented in [docs/SOURCE_INFISICAL.md](docs/SOURCE_INFISICAL.md).
+  - `host`: optional Infisical base URL. Defaults to `INFISICAL_HOST` or `https://app.infisical.com`.
+  - `project_id` or `project_slug`: source project. `project_id` takes precedence if both are set.
+  - `environment_slug`: required environment slug such as `dev`, `staging`, or `prod`.
+  - `secret_path`: source folder path in Infisical (default `/`).
+  - `auth_method`: optional `token` or `universal_auth`.
+  - Authentication is environment-only via `INFISICAL_TOKEN` or `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
+  - `rate_limit_rps`, `concurrency`: control throughput.
+  - `recursive`, `include_imports`, `expand_secret_references`: control how Infisical returns secrets.
+  - `include_regex`, `tag_filters`, `strip_prefix`: filter and transform emitted secret names.
 
 - `keeper`: Uses the Keeper Commander SDK/CLI session to pull records from Keeper Enterprise. Requires a logged-in Keeper Commander environment with persistent login or inline credentials. Reference guide: [docs/SOURCE_KEEPER.md](docs/SOURCE_KEEPER.md).
   - `folder`: Keeper folder or path to read from (required).
@@ -154,6 +168,16 @@ sources:
       vault: 'EnvironmentSecrets'
       include_regex: '^APP_.*'
       tag_filters: ['default','prod']
+  - name: infisical
+    type: infisical
+    options:
+      host: 'https://infisical.example.internal'
+      project_id: 'd9754256-c41g-af56-45a9-23f08a936f33'
+      environment_slug: 'dev'
+      secret_path: '/config'
+      auth_method: token
+      include_regex: '^APP_.*'
+      strip_prefix: 'APP_'
 
 sinks:
   - name: ssm-secrets
@@ -202,8 +226,8 @@ sinks:
 - Python 3.10+
 - AWS credentials/auth per your environment (respects `AWS_PROFILE`, `AWS_DEFAULT_REGION`/`AWS_REGION`).
 - 1Password source requires the `op` CLI with a service account token (via `OP_SERVICE_ACCOUNT_TOKEN` or `options.service_account_token`).
+- Infisical source and sink require the `infisicalsdk` Python package (installed with this tool) plus either `INFISICAL_TOKEN` or the pair `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
 - Keeper source requires the Keeper Commander CLI config (`~/.keeper/config.json`) and the `keepercommander` Python package (installed with this tool). The Keeper CLI credentials can be overridden with `options.keeper_*` or `KEEPER_*` environment variables.
-- Infisical sink requires the `infisicalsdk` Python package (installed with this tool) plus either `INFISICAL_TOKEN` or the pair `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
 
 ### Notes
 
