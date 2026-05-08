@@ -130,4 +130,12 @@ def build_sink(
             print_sync_details=print_sync_details,
             detail_value_snapshots=detail_value_snapshots,
         )
+    if t == "infisical":
+        from .infisical import InfisicalSink
+
+        return InfisicalSink(
+            cfg,
+            print_sync_details=print_sync_details,
+            detail_value_snapshots=detail_value_snapshots,
+        )
     raise ValueError(f"Unknown sink type: {cfg.type}")

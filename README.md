@@ -1,6 +1,17 @@
 # Secrets Sync
 
-Async CLI to pull secrets from multiple sources (env, YAML, 1Password) and push to AWS SSM Parameter Store and/or AWS Secrets Manager with concurrency, per-sink rate limiting, retry/backoff, multi-file config merging, variable templating, and per-sink routing.
+## Description
+
+Async CLI to pull secrets from:
+- environment variables
+- YAML files
+- 1Password vaults
+- Keeper folders
+
+and push them to:
+- AWS SSM Parameter Store
+- AWS Secrets Manager
+- Infisical
 
 ## Install
 
@@ -25,7 +36,7 @@ Flags:
 - `--file, -f PATH`: add a config file to merge (may be repeated; later overrides earlier).
 - `--print-values`: print a preview of what will be pushed, grouped by sink. Combine with `--dry-run` for preview only.
 - `--print-format {list,table,json}`: output format for preview (default `list`).
-- `--dry-run`: collect and optionally print, but do not push to AWS.
+- `--dry-run`: collect and optionally print, but do not push to remote sinks.
 - `--print-sync-details`: print a line for each item as it's synced (success/failure plus created/unchanged/changed). When combined with `--print-values`, each log also shows value snapshots (`created 'new'`, `unchanged 'old'`, or `changed 'old' -> 'new'`).
 
 ## Config
@@ -43,21 +54,18 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 ### Sources
 
 - `env`: Reads directly from the running process environment. Use this source to capture secrets already loaded into the shell or CI job. See [docs/SOURCE_ENV.md](docs/SOURCE_ENV.md) for scenarios and examples.
-
   - `include_regex`: regex to include (or `include: [patterns]`)
   - `exclude`: list of regexes to exclude
   - `keys`: explicit variable names to include
   - `strip_prefix`: remove leading prefix from names
 
 - `yaml`: Loads values from one or more YAML documents on disk. Files are merged in order so you can provide layered defaults plus environment overrides. Additional details live in [docs/SOURCE_YAML.md](docs/SOURCE_YAML.md).
-
   - `files`: list of YAML file paths (merged in order; later files override earlier)
   - `key`: dot-path to the subtree to read (e.g., `values` for the example shape)
   - Supported structures: mapping of `name: value`, or `{ values: [ { name, value, description } ] }`, or a list of `{ name, value, description }`.
   - Relative paths are resolved against the config file where they are declared (not the working directory). This also holds when merging multiple config files.
 
 - `1password`: Fetches items from a 1Password vault and maps each item title to a secret. Requires the 1Password `op` CLI to be installed plus either a configured `service_account_token` or the `OP_SERVICE_ACCOUNT_TOKEN` environment variable for authentication. Full walkthrough: [docs/SOURCE_1PASSWORD.md](docs/SOURCE_1PASSWORD.md).
-
   - `vault`: Vault name (required).
   - `tag_filters`: Only items containing any of these tags are included. The list order also determines override priority when multiple items share the same title.
   - `include_regex`: Optional regex applied to item titles for additional filtering.
@@ -65,7 +73,6 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `concurrency`: Number of parallel fetches when pulling item details (default `8`).
 
 - `keeper`: Uses the Keeper Commander SDK/CLI session to pull records from Keeper Enterprise. Requires a logged-in Keeper Commander environment with persistent login or inline credentials. Reference guide: [docs/SOURCE_KEEPER.md](docs/SOURCE_KEEPER.md).
-
   - `folder`: Keeper folder or path to read from (required).
   - `tag_filters`: Only records whose custom `tags` field matches any supplied tag are included. The list order also determines override priority when multiple items share the same title.
   - `include_regex`: Optional regex applied to record titles.
@@ -75,7 +82,6 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 ### Sinks
 
 - `ssm` options:
-
   - `prefix`: optional string prefix for parameter names (supports `{{ VAR }}` placeholders)
   - `type`: `SecureString` (default) or `String` (any other value errors at load time)
   - `tier`: `Standard` (default) or `Advanced`. Values over 4 KB (measured after UTF-8 encoding) are automatically promoted to the Advanced tier with a warning so large file-style secrets can be stored without changing the source config. Note: Values over 8 KB will fail with an error.
@@ -86,6 +92,16 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `secrets_manager` options:
   - `prefix`: optional string prefix for secret names (supports `{{ VAR }}`)
   - `kms_key_id`, `rate_limit_rps`, `concurrency` similar to SSM
+
+- `infisical`: Writes to an Infisical project, environment, and folder path. Detailed setup, auth, slug lookup, and `secret_path` behavior are documented in [docs/SINK_INFISICAL.md](docs/SINK_INFISICAL.md).
+  - `host`: optional Infisical base URL. Defaults to `INFISICAL_HOST` or `https://app.infisical.com`.
+  - `project_id` or `project_slug`: target project. `project_id` takes precedence if both are set.
+  - `environment_slug`: required environment slug such as `dev`, `staging`, or `prod`.
+  - `secret_path`: target folder path in Infisical (default `/`).
+  - `name_prefix`: optional prefix prepended to each secret key before writing.
+  - `auth_method`: optional `token` or `universal_auth`.
+  - Authentication is environment-only via `INFISICAL_TOKEN` or `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
+  - `rate_limit_rps`, `concurrency`: control throughput.
 
 The AWS API usage for both AWS sinks are paced automatically: the sinks meter requests so they stay within the configured `rate_limit_rps`, and they fall back to exponential backoff with jitter whenever AWS responds with throttling errors.
 
@@ -161,6 +177,24 @@ sinks:
     options:
       prefix: 'env/{{ ENVIRONMENT_NAME }}/secret/'
     sources: [ '1password' ]
+  - name: infisical-config
+    type: infisical
+    options:
+      host: 'https://infisical.example.internal'
+      project_slug: 'streaming-tech'
+      environment_slug: 'dev'
+      secret_path: '/config'
+      auth_method: token
+    sources: [ 'external-yaml-file', 'env' ]
+  - name: infisical-secrets
+    type: infisical
+    options:
+      host: 'https://infisical.example.internal'
+      project_id: 'project-id'
+      environment_slug: 'dev'
+      secret_path: '/secrets'
+      auth_method: universal_auth
+    sources: [ '1password' ]
 ```
 
 ### Requirements
@@ -169,6 +203,7 @@ sinks:
 - AWS credentials/auth per your environment (respects `AWS_PROFILE`, `AWS_DEFAULT_REGION`/`AWS_REGION`).
 - 1Password source requires the `op` CLI with a service account token (via `OP_SERVICE_ACCOUNT_TOKEN` or `options.service_account_token`).
 - Keeper source requires the Keeper Commander CLI config (`~/.keeper/config.json`) and the `keepercommander` Python package (installed with this tool). The Keeper CLI credentials can be overridden with `options.keeper_*` or `KEEPER_*` environment variables.
+- Infisical sink requires the `infisicalsdk` Python package (installed with this tool) plus either `INFISICAL_TOKEN` or the pair `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
 
 ### Notes
 

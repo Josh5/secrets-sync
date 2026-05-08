@@ -18,6 +18,13 @@ from .utils.logging import setup_logging
 logger = logging.getLogger(__name__)
 
 
+def _log_user_error(summary: str, exc: Exception) -> int:
+    logger.error("%s", summary)
+    for line in str(exc).splitlines():
+        logger.error("  %s", line)
+    return 1
+
+
 async def collect_secrets_from_cfg(cfg) -> Dict[str, SecretItem]:
 
     # Configure AWS session from cfg.aws or env (GitLab CI vars supported)
@@ -79,6 +86,15 @@ def _prefixed_name(sink_cfg, item: SecretItem) -> str:
         if prefix:
             return f"{prefix.rstrip('/')}/{item.name}"
         return item.name
+    if t == "infisical":
+        path = str(opts.get("secret_path") or opts.get("path") or "/").strip() or "/"
+        if not path.startswith("/"):
+            path = f"/{path}"
+        name_prefix = opts.get("name_prefix") or opts.get("prefix") or ""
+        secret_name = f"{name_prefix}{item.name}"
+        if path == "/":
+            return f"/{secret_name}"
+        return f"{path.rstrip('/')}/{secret_name}"
     return item.name
 
 
@@ -113,6 +129,12 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
             pref = opts.get("prefix") or ""
             if pref:
                 header_details.append(f"prefix='{pref}'")
+        elif t == "infisical":
+            path = opts.get("secret_path") or opts.get("path") or "/"
+            header_details.append(f"path='{path}'")
+            name_prefix = opts.get("name_prefix") or opts.get("prefix") or ""
+            if name_prefix:
+                header_details.append(f"name_prefix='{name_prefix}'")
         if sources:
             header_details.append(f"sources={','.join(sources)}")
         header = f"--- Sink: {name} [{t}]"
@@ -157,6 +179,8 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
                 prefix = opts.get("prefix") or opts.get("path_prefix") or ""
             elif t in ("secrets", "secrets_manager", "secretsmanager"):
                 prefix = opts.get("prefix") or ""
+            elif t == "infisical":
+                prefix = opts.get("secret_path") or opts.get("path") or "/"
             selected = [i for i in items.values() if not sources or i.source in sources]
             items_list = [
                 {
@@ -179,7 +203,7 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
 
 
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Sync secrets to AWS SSM / Secrets Manager")
+    p = argparse.ArgumentParser(description="Sync secrets to configured sinks")
     p.add_argument("--file", "-f", action="append", dest="files",
                    help="YAML config file(s) to merge; later overrides earlier", default=[])
     p.add_argument("--print-values", action="store_true", help="Print gathered secrets to STDOUT")
@@ -189,7 +213,11 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
         default="none",
         help="Output format for --print-values",
     )
-    p.add_argument("--dry-run", action="store_true", help="Collect and optionally print, but don't push")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Collect and optionally print, but don't push to sinks",
+    )
     p.add_argument(
         "--print-sync-details",
         action="store_true",
@@ -214,7 +242,10 @@ async def _main_async() -> int:
         return 2
 
     logger.info("Collecting secrets from sources…")
-    items = await collect_secrets_from_cfg(cfg)
+    try:
+        items = await collect_secrets_from_cfg(cfg)
+    except Exception as e:
+        return _log_user_error("Failed while collecting secrets.", e)
     logger.info("Collected %d items", len(items))
 
     if getattr(args, "print_values", False):
@@ -231,12 +262,15 @@ async def _main_async() -> int:
 
     logger.info("Pushing to sinks…")
     include_value_details = bool(args.print_sync_details and args.print_values)
-    await push_to_sinks_from_cfg(
-        cfg,
-        items,
-        print_sync_details=args.print_sync_details,
-        detail_value_snapshots=include_value_details,
-    )
+    try:
+        await push_to_sinks_from_cfg(
+            cfg,
+            items,
+            print_sync_details=args.print_sync_details,
+            detail_value_snapshots=include_value_details,
+        )
+    except Exception as e:
+        return _log_user_error("Failed while pushing to sinks.", e)
     logger.info("Push complete")
     return 0
 
