@@ -180,13 +180,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate tagged release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 #v1.16.0
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd #v1.21.0
         if: needs.py_build.outputs.is_prerelease == 'false' && steps.check_tag_exists.outputs.exists == 'false'
         with:
           name: 'Tagged Build: ${{ needs.py_build.outputs.base_version }}'
           body: 'Versioned release'
-          # TODO: Replace with GITHUB_TOKEN when this is fixed -> https://github.com/orgs/community/discussions/180355
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: './out/${{ needs.py_build.outputs.package_name }}-${{ needs.py_build.outputs.release_version }}.zip,./out/${{ needs.py_build.outputs.package_name }}-${{ needs.py_build.outputs.release_version }}.tar.gz'
           generateReleaseNotes: true
           allowUpdates: false
@@ -195,12 +194,11 @@ jobs:
           commit: ${{ github.sha }}
 
       - name: Update latest development release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 #v1.16.0
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd #v1.21.0
         with:
           name: 'Development Build'
           body: 'Latest development release'
-          # TODO: Replace with GITHUB_TOKEN when this is fixed -> https://github.com/orgs/community/discussions/180355
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: './out/${{ needs.py_build.outputs.package_name }}-${{ needs.py_build.outputs.release_version }}.zip,./out/${{ needs.py_build.outputs.package_name }}-${{ needs.py_build.outputs.release_version }}.tar.gz'
           generateReleaseNotes: true
           allowUpdates: true
