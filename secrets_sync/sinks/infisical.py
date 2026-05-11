@@ -85,6 +85,10 @@ class InfisicalSink(BaseSink):
         self._api_check_lock = asyncio.Lock()
         self._resolved_project_id = self.project_id
         self._project_id_lock = asyncio.Lock()
+        self._project_data = None
+        self._project_data_lock = asyncio.Lock()
+        self._environment_checked = False
+        self._environment_check_lock = asyncio.Lock()
         self._path_checked = False
         self._path_check_lock = asyncio.Lock()
 
@@ -265,30 +269,135 @@ class InfisicalSink(BaseSink):
         response.raise_for_status()
         return response.json()
 
+    async def _fetch_project_data(self, client):
+        if self._project_data is not None:
+            return self._project_data
+        async with self._project_data_lock:
+            if self._project_data is not None:
+                return self._project_data
+            try:
+                data = await asyncio.to_thread(self._fetch_projects, client)
+            except Exception as exc:
+                self._raise_request_context("project lookup", exc)
+            self._project_data = data
+            return data
+
+    async def _resolve_project(self, client) -> dict:
+        data = await self._fetch_project_data(client)
+
+        for project in data.get("projects", []):
+            project_id = str(project.get("id", "")).strip()
+            project_slug = str(project.get("slug", "")).strip()
+            if self.project_id and project_id == self.project_id:
+                self._resolved_project_id = project_id
+                return project
+            if self.project_slug and project_slug == self.project_slug:
+                if project_id:
+                    self._resolved_project_id = project_id
+                return project
+
+        if self.project_id:
+            self._raise_request_context(
+                "project lookup",
+                RuntimeError(f"Project with id {self.project_id!r} was not found"),
+            )
+        self._raise_request_context(
+            "project lookup",
+            RuntimeError(f"Project with slug {self.project_slug!r} was not found"),
+        )
+
     async def _resolve_project_id(self, client) -> str:
         if self._resolved_project_id:
             return self._resolved_project_id
         async with self._project_id_lock:
             if self._resolved_project_id:
                 return self._resolved_project_id
+            project = await self._resolve_project(client)
+            project_id = str(project.get("id", "")).strip()
+            if not project_id:
+                self._raise_request_context(
+                    "project lookup",
+                    RuntimeError("Project lookup returned a project without an ID"),
+                )
+            self._resolved_project_id = project_id
+            return project_id
 
-            try:
-                data = await asyncio.to_thread(self._fetch_projects, client)
-            except Exception as exc:
-                self._raise_request_context("project lookup", exc)
+    def _create_environment(
+        self,
+        client,
+        *,
+        project_id: str,
+        environment_slug: str,
+        environment_name: str,
+        position: Optional[int],
+    ):
+        payload = {
+            "name": environment_name,
+            "slug": environment_slug,
+        }
+        if position is not None:
+            payload["position"] = position
+        response = client.api.session.post(
+            self._build_api_url(f"/api/v1/projects/{project_id}/environments"),
+            json=payload,
+            allow_redirects=False,
+            timeout=15,
+        )
+        response.raise_for_status()
+        return response.json()
 
-            for project in data.get("projects", []):
-                if str(project.get("slug", "")).strip() == self.project_slug:
-                    project_id = str(project.get("id", "")).strip()
-                    if not project_id:
-                        break
+    async def _ensure_environment(self, client) -> str:
+        if self._environment_checked:
+            return await self._resolve_project_id(client)
+
+        async with self._environment_check_lock:
+            if self._environment_checked:
+                return await self._resolve_project_id(client)
+
+            project = await self._resolve_project(client)
+            project_id = str(project.get("id", "")).strip()
+            if not project_id:
+                self._raise_request_context(
+                    "project lookup",
+                    RuntimeError("Project lookup returned a project without an ID"),
+                )
+
+            environments = project.get("environments") or []
+            for env in environments:
+                if str(_get_attr(env, "slug") or "").strip() == self.environment_slug:
                     self._resolved_project_id = project_id
+                    self._environment_checked = True
                     return project_id
 
-            self._raise_request_context(
-                "project lookup",
-                RuntimeError(f"Project with slug {self.project_slug!r} was not found"),
-            )
+            positions = []
+            for env in environments:
+                raw_position = _get_attr(env, "position")
+                if raw_position is None:
+                    continue
+                try:
+                    positions.append(int(raw_position))
+                except (TypeError, ValueError):
+                    continue
+            next_position = (max(positions) + 1) if positions else None
+
+            try:
+                await asyncio.to_thread(
+                    self._create_environment,
+                    client,
+                    project_id=project_id,
+                    environment_slug=self.environment_slug,
+                    environment_name=self.environment_slug,
+                    position=next_position,
+                )
+            except Exception as exc:
+                message = str(exc).lower()
+                if "already exists" not in message:
+                    self._raise_request_context("environment create", exc)
+
+            self._resolved_project_id = project_id
+            self._environment_checked = True
+            self._project_data = None
+            return project_id
 
     async def _list_folders(self, client, *, project_id: str, path: str):
         def do_list():
@@ -320,15 +429,15 @@ class InfisicalSink(BaseSink):
         await asyncio.to_thread(do_create)
 
     async def _ensure_secret_path(self, client) -> None:
-        if self.secret_path == "/":
-            self._path_checked = True
-            return
-
         async with self._path_check_lock:
             if self._path_checked:
                 return
 
-            project_id = await self._resolve_project_id(client)
+            project_id = await self._ensure_environment(client)
+            if self.secret_path == "/":
+                self._path_checked = True
+                return
+
             current_path = "/"
             for segment in [part for part in self.secret_path.split("/") if part]:
                 try:

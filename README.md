@@ -31,10 +31,16 @@ pip install secrets-sync
 
 To setup a local dev env, use [`uv`](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer)
 
-```
+```bash
 uv venv && uv pip install --editable .
 
 source .venv/bin/activate
+```
+
+or just run with `uv`
+
+```bash
+uv run secrets-sync --dry-run --print-values --print-format=table -f secrets-sync.yaml
 ```
 
 To bump the package version, use `uv version`:
@@ -141,8 +147,8 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `infisical`: Writes to an Infisical project, environment, and folder path. Detailed setup, auth, slug lookup, and `secret_path` behavior are documented in [docs/SINK_INFISICAL.md](docs/SINK_INFISICAL.md).
   - `host`: optional Infisical base URL. Defaults to `INFISICAL_HOST` or `https://app.infisical.com`.
   - `project_id` or `project_slug`: target project. `project_id` takes precedence if both are set.
-  - `environment_slug`: required environment slug such as `dev`, `staging`, or `prod`.
-  - `secret_path`: target folder path in Infisical (default `/`).
+  - `environment_slug`: required environment slug such as `dev`, `staging`, or `prod`. Missing environments are created automatically.
+  - `secret_path`: target folder path in Infisical (default `/`). Missing folders are created automatically.
   - `name_prefix`: optional prefix prepended to each secret key before writing.
   - `auth_method`: optional `token` or `universal_auth`.
   - Authentication is environment-only via `INFISICAL_TOKEN` or `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.

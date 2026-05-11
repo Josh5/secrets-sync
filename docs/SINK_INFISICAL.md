@@ -22,7 +22,7 @@ sinks:
 
 - `host`: Optional Infisical base URL. Defaults to `INFISICAL_HOST` or `https://app.infisical.com`.
 - `project_id` or `project_slug`: Target Infisical project. `project_id` takes precedence if both are set.
-- `environment_slug`: Required environment slug such as `dev`, `staging`, or `prod`.
+- `environment_slug`: Required environment slug such as `dev`, `staging`, or `prod`. Missing environments are created automatically before the first sync using the slug as the initial display name.
 - `secret_path`: Folder path inside the selected project environment. Use `/` for the root folder, `/config` for a folder named `config`, or nested paths like `/service-a/config`. Missing folders are created automatically before the first sync.
 - `name_prefix`: Optional string prepended to each secret key before writing.
 - `auth_method`: Optional `token` or `universal_auth`. If omitted, token auth is selected when `INFISICAL_TOKEN` is present; otherwise universal auth is used.
@@ -161,9 +161,5 @@ sinks:
 
 - `project slug was not found`:
   - The display name and slug are different. Query `/api/v1/projects` and use the returned `slug`, or prefer `project_id`.
-- `Folder with path '/config' ... was not found`:
-  - The sink now attempts to create missing folders automatically. If this still appears, check that the token or machine identity can manage folders in the target project.
-- `redirected ... to accounts.google.com`:
-  - Your API hostname is behind interactive SSO. Exempt `/api/*` from that auth layer or use a direct backend hostname.
 - `401` or `403`:
   - Check the token or machine identity credentials and confirm the identity has access to the target project and path.
