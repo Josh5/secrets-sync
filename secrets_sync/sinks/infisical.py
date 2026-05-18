@@ -61,9 +61,7 @@ class InfisicalSink(BaseSink):
             o.get("environment_slug") or o.get("environment"),
             "Infisical sink requires 'environment_slug'",
         )
-        self.secret_path = self._read_path(
-            o.get("secret_path") or o.get("path") or "/"
-        )
+        self.secret_path = self._read_path(o.get("secret_path") or o.get("path") or "/")
         self.name_prefix = (
             self._clean_str(o.get("name_prefix") or o.get("prefix")) or ""
         )
@@ -205,8 +203,40 @@ class InfisicalSink(BaseSink):
             await asyncio.to_thread(self._check_api_access, client)
             self._api_checked = True
 
+    def _read_response_error(self, response) -> Optional[str]:
+        if response is None:
+            return None
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = None
+
+        if isinstance(data, dict):
+            message = data.get("message")
+            if message is not None:
+                text = str(message).strip()
+                if text:
+                    return text
+
+        body = getattr(response, "text", "")
+        if body is None:
+            return None
+        preview = str(body).strip().replace("\n", " ")[:200]
+        return preview or None
+
+    def _describe_exception(self, exc: Exception) -> str:
+        if isinstance(exc, requests.RequestException):
+            response = getattr(exc, "response", None)
+            detail = self._read_response_error(response)
+            if detail:
+                base = str(exc).strip()
+                if detail.lower() not in base.lower():
+                    return f"{base} | Response: {detail}"
+        return str(exc).strip()
+
     def _friendly_error_message(self, operation: str, exc: Exception) -> str:
-        message = str(exc).strip()
+        message = self._describe_exception(exc)
         project_ref = self.project_id or self.project_slug or "<missing>"
 
         if "Project with slug" in message and "not found" in message:
@@ -346,6 +376,18 @@ class InfisicalSink(BaseSink):
         response.raise_for_status()
         return response.json()
 
+    def _project_has_environment(self, project: object) -> bool:
+        environments = _get_attr(project, "environments") or []
+        for env in environments:
+            if str(_get_attr(env, "slug") or "").strip() == self.environment_slug:
+                return True
+        return False
+
+    async def _environment_exists(self, client) -> bool:
+        self._project_data = None
+        project = await self._resolve_project(client)
+        return self._project_has_environment(project)
+
     async def _ensure_environment(self, client) -> str:
         if self._environment_checked:
             return await self._resolve_project_id(client)
@@ -361,15 +403,13 @@ class InfisicalSink(BaseSink):
                     "project lookup",
                     RuntimeError("Project lookup returned a project without an ID"),
                 )
-
-            environments = project.get("environments") or []
-            for env in environments:
-                if str(_get_attr(env, "slug") or "").strip() == self.environment_slug:
-                    self._resolved_project_id = project_id
-                    self._environment_checked = True
-                    return project_id
+            if self._project_has_environment(project):
+                self._resolved_project_id = project_id
+                self._environment_checked = True
+                return project_id
 
             positions = []
+            environments = project.get("environments") or []
             for env in environments:
                 raw_position = _get_attr(env, "position")
                 if raw_position is None:
@@ -392,7 +432,12 @@ class InfisicalSink(BaseSink):
             except Exception as exc:
                 message = str(exc).lower()
                 if "already exists" not in message:
-                    self._raise_request_context("environment create", exc)
+                    for delay in (0.5, 1, 2):
+                        await asyncio.sleep(delay)
+                        if await self._environment_exists(client):
+                            break
+                    else:
+                        self._raise_request_context("environment create", exc)
 
             self._resolved_project_id = project_id
             self._environment_checked = True
