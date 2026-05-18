@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 import subprocess
 from typing import Dict, List, Optional
 
@@ -28,12 +27,11 @@ class OnePasswordSource(BaseSource):
         self.vault: str = o.get("vault") or ""
         if not self.vault:
             raise ValueError("1Password source requires 'vault' option")
-        self.tag_filters: List[str] = self._normalize_tag_list(o.get("tag_filters") or [])
+        self.tag_filters: List[str] = self._read_tag_list(o.get("tag_filters") or [])
         self._tag_filter_set = set(self.tag_filters)
-        self.include_re: Optional[re.Pattern[str]] = None
-        if o.get("include_regex"):
-            self.include_re = re.compile(str(o.get("include_regex")))
-        self.token: Optional[str] = o.get("service_account_token") or os.getenv("OP_SERVICE_ACCOUNT_TOKEN")
+        self.token: Optional[str] = o.get("service_account_token") or os.getenv(
+            "OP_SERVICE_ACCOUNT_TOKEN"
+        )
         self.concurrency: int = int(o.get("concurrency", 8))
 
     def _env(self) -> dict:
@@ -52,10 +50,12 @@ class OnePasswordSource(BaseSource):
         items: List[dict] = []
         for it in data:
             title = it.get("title", "")
-            tags = self._normalize_tag_list(it.get("tags") or [])
-            if self.tag_filters and not any(tag in self._tag_filter_set for tag in tags):
+            tags = self._read_tag_list(it.get("tags") or [])
+            if self.tag_filters and not any(
+                tag in self._tag_filter_set for tag in tags
+            ):
                 continue
-            if self.include_re and not self.include_re.search(title):
+            if not self.accepts_name(str(title)):
                 continue
             items.append(it)
         return items
@@ -91,7 +91,9 @@ class OnePasswordSource(BaseSource):
                 title = detail.get("title") or it.get("title")
                 value = self._extract_value(detail)
                 if title and value is not None:
-                    tags = self._normalize_tag_list(detail.get("tags") or it.get("tags") or [])
+                    tags = self._read_tag_list(
+                        detail.get("tags") or it.get("tags") or []
+                    )
                     return SecretCandidate(name=str(title), value=str(value), tags=tags)
                 return None
 

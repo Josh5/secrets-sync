@@ -61,7 +61,7 @@ class InfisicalSink(BaseSink):
             o.get("environment_slug") or o.get("environment"),
             "Infisical sink requires 'environment_slug'",
         )
-        self.secret_path = self._normalize_path(
+        self.secret_path = self._read_path(
             o.get("secret_path") or o.get("path") or "/"
         )
         self.name_prefix = (
@@ -104,7 +104,7 @@ class InfisicalSink(BaseSink):
             raise ValueError(error)
         return text
 
-    def _normalize_path(self, raw: object) -> str:
+    def _read_path(self, raw: object) -> str:
         path = self._required_str(raw, "Infisical sink requires 'secret_path'")
         if not path.startswith("/"):
             path = f"/{path}"

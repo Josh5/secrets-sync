@@ -31,7 +31,7 @@ values:
     description: "Populated from vars/files/dev-cert.pem via lookup()."
 ```
 
-Filters `from_json` and `to_json` are also available so you can parse JSON blobs from disk, manipulate them, and re-emit normalized JSON:
+Filters `from_json` and `to_json` are also available so you can parse JSON blobs from disk, manipulate them, and re-emit standrdised JSON:
 
 ```yaml
 values:

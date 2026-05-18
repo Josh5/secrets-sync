@@ -11,7 +11,7 @@ values:
     value: "{{ lookup('file', './files/{}-cert.pem'.format(ENVIRONMENT_NAME)) }}"
     description: 'Populated from vars/files/dev-cert.pem via lookup().'
 
-  # Example filters: read JSON metadata, parse, and emit normalized JSON.
+  # Example filters: read JSON metadata, parse, and emit standrdised JSON.
   - name: TLS_CERT_METADATA
     value: "{{ lookup('file', './files/{}-metadata.json'.format(ENVIRONMENT_NAME)) | from_json | to_json }}"
     description: 'Demonstrates from_json/to_json filters on lookup output.'

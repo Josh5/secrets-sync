@@ -37,7 +37,7 @@ class SsmSink(BaseSink):
         self.param_type: str = str(o.get("type", "SecureString"))
         if self.param_type not in ("SecureString", "String"):
             raise ValueError("SSM 'type' must be 'SecureString' or 'String'")
-        self._default_tier = self._normalize_tier(o.get("tier"))
+        self._default_tier = self._read_tier(o.get("tier"))
         self.kms_key_id = o.get("kms_key_id")
         self.rate_limit_rps = float(o.get("rate_limit_rps", 10))
         self.concurrency = int(o.get("concurrency", 10))
@@ -62,13 +62,13 @@ class SsmSink(BaseSink):
         except self.client.exceptions.ParameterNotFound:
             return False, None
 
-    def _normalize_tier(self, tier_option: Optional[str]) -> str:
+    def _read_tier(self, tier_option: Optional[str]) -> str:
         if not tier_option:
             return "Standard"
-        normalized = str(tier_option).strip().lower()
-        if normalized not in ("standard", "advanced"):
+        tier_name = str(tier_option).strip().lower()
+        if tier_name not in ("standard", "advanced"):
             raise ValueError("SSM 'tier' must be 'Standard' or 'Advanced'")
-        return "Standard" if normalized == "standard" else "Advanced"
+        return "Standard" if tier_name == "standard" else "Advanced"
 
     def _determine_parameter_tier(self, param_name: str, value: str) -> str:
         size_bytes = len(value.encode("utf-8"))
@@ -88,7 +88,9 @@ class SsmSink(BaseSink):
             return "Advanced"
         return self._default_tier
 
-    def _classify_action(self, existed: bool, old_value: Optional[str], new_value: str) -> str:
+    def _classify_action(
+        self, existed: bool, old_value: Optional[str], new_value: str
+    ) -> str:
         if not existed:
             return "created"
         if old_value == new_value:

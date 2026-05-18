@@ -117,7 +117,9 @@ sources:
     type: keeper
     options:
       folder: 'EnvironmentSecrets'              # required shared folder/path
-      include_regex: '^APP_.*'                  # optional filter on record title
+      include_regex: ['^APP_.*', '^SHARED_.*']  # optional filter on record title
+      exclude_regex: '_DEBUG$'                  # optional exclusion filter
+      strip_prefix: ['APP_', 'SHARED_']         # optional emitted-name transforms
       tag_filters: ['default','prod']           # matches custom field "tags"
       config_file: '/custom/path/config.json'   # optional; only needed when using Keeper's config file
       keeper_user: '{{ vars.KEEPER_USER }}'     # recommended (or set KEEPER_USER env var)

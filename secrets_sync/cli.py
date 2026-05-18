@@ -12,7 +12,7 @@ import boto3
 from .config import load_config_from_files
 from .models import SecretItem
 from .sources.base import build_source
-from .sinks.base import build_sink
+from .sinks.base import build_sink, select_sink_items, transform_sink_item_name
 from .utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -96,20 +96,7 @@ def _prefixed_name(sink_cfg, item: SecretItem) -> str:
             return f"/{secret_name}"
         return f"{path.rstrip('/')}/{secret_name}"
     if t == "dotenv":
-        strip_prefixes = opts.get("strip_prefixes")
-        if strip_prefixes is None:
-            strip_prefixes = opts.get("strip_prefix")
-        if strip_prefixes is None:
-            prefixes = []
-        elif isinstance(strip_prefixes, list):
-            prefixes = [str(value) for value in strip_prefixes]
-        else:
-            prefixes = [str(strip_prefixes)]
-
-        name = item.name
-        for prefix in prefixes:
-            if prefix and name.startswith(prefix):
-                name = name[len(prefix):]
+        name = transform_sink_item_name(opts, item.name)
 
         key_case = str(opts.get("key_case") or "").strip().lower()
         force_upper = bool(opts.get("force_uppercase", False))
@@ -135,7 +122,12 @@ def _print_table(headers: List[str], rows: List[List[str]]) -> None:
     print(sep)
     # Rows
     for r in rows:
-        print(" | ".join((r[i] if r[i] is not None else "").ljust(widths[i]) for i in range(len(headers))))
+        print(
+            " | ".join(
+                (r[i] if r[i] is not None else "").ljust(widths[i])
+                for i in range(len(headers))
+            )
+        )
 
 
 def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> None:
@@ -173,7 +165,7 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
             header += " " + " ".join(header_details)
 
         # Filter by configured sources
-        selected = [i for i in items.values() if not sources or i.source in sources]
+        selected = select_sink_items(sink_cfg, list(items.values()))
         if fmt == "none":
             # Don't print anything
             pass
@@ -214,7 +206,7 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
                 prefix = opts.get("secret_path") or opts.get("path") or "/"
             elif t == "dotenv":
                 prefix = opts.get("path") or opts.get("file") or ""
-            selected = [i for i in items.values() if not sources or i.source in sources]
+            selected = select_sink_items(sink_cfg, list(items.values()))
             items_list = [
                 {
                     "name": _prefixed_name(sink_cfg, it),

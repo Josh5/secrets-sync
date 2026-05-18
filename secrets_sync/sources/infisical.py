@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 from typing import Dict, Iterable, Optional
 
 import requests
@@ -52,13 +51,10 @@ class InfisicalSource(BaseSource):
             options.get("environment_slug") or options.get("environment"),
             "Infisical source requires 'environment_slug'",
         )
-        self.secret_path = self._normalize_path(
+        self.secret_path = self._read_path(
             options.get("secret_path") or options.get("path") or "/"
         )
-        include_regex = self._clean_str(options.get("include_regex"))
-        self.include_re = re.compile(include_regex) if include_regex else None
-        self.strip_prefix = self._clean_str(options.get("strip_prefix")) or ""
-        self.tag_filters = self._normalize_tag_list(options.get("tag_filters") or [])
+        self.tag_filters = self._read_tag_list(options.get("tag_filters") or [])
         self.recursive = self._as_bool(options.get("recursive"), default=False)
         self.include_imports = self._as_bool(
             options.get("include_imports"), default=False
@@ -95,7 +91,7 @@ class InfisicalSource(BaseSource):
             raise ValueError(error)
         return text
 
-    def _normalize_path(self, raw: object) -> str:
+    def _read_path(self, raw: object) -> str:
         path = self._required_str(raw, "Infisical source requires 'secret_path'")
         if not path.startswith("/"):
             path = f"/{path}"
@@ -274,17 +270,6 @@ class InfisicalSource(BaseSource):
             kwargs["project_slug"] = self.project_slug  # type: ignore[assignment]
         return kwargs
 
-    def _matches_name(self, secret_name: str) -> bool:
-        if self.include_re and not self.include_re.search(secret_name):
-            return False
-        return True
-
-    def _emitted_name(self, secret_name: str) -> str:
-        name = secret_name
-        if self.strip_prefix and name.startswith(self.strip_prefix):
-            name = name[len(self.strip_prefix) :]
-        return name
-
     async def _list_secrets(self) -> Iterable[object]:
         client = await self._client_instance()
         await self._ensure_api_access(client)
@@ -316,9 +301,9 @@ class InfisicalSource(BaseSource):
             if secret_name is None:
                 continue
             source_name = str(secret_name)
-            if not self._matches_name(source_name):
+            if not self.accepts_name(source_name):
                 continue
-            emitted_name = self._emitted_name(source_name)
+            emitted_name = self.transform_name(source_name)
             secret_value = _get_attr(secret, "secretValue", "secret_value", "value")
             secret_comment = _get_attr(
                 secret, "secretComment", "secret_comment", "comment", "description"
@@ -333,7 +318,7 @@ class InfisicalSource(BaseSource):
                     f"Configured environment_slug: {self.environment_slug!r}\n"
                     f"Configured secret_path: {self.secret_path!r}\n"
                     "This can happen when 'recursive' or 'include_imports' pulls multiple paths that reuse "
-                    "the same key, or when 'strip_prefix' collapses distinct names. Narrow the path or filters "
+                    "the same key, or when strip transforms collapse distinct names. Narrow the path or filters "
                     "so each emitted secret name is unique."
                 )
             original_names[emitted_name] = source_name

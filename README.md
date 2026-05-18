@@ -40,7 +40,9 @@ source .venv/bin/activate
 or just run with `uv`
 
 ```bash
-uv run secrets-sync --dry-run --print-values --print-format=table -f secrets-sync.yaml
+uv run secrets-sync --dry-run --print-values --print-format=table -f my-config.yaml
+
+uv run secrets-sync --print-sync-details -f my-config.yaml
 ```
 
 To bump the package version, use `uv version`:
@@ -94,10 +96,10 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 ### Sources
 
 - `env`: Reads directly from the running process environment. Use this source to capture secrets already loaded into the shell or CI job. See [docs/SOURCE_ENV.md](docs/SOURCE_ENV.md) for scenarios and examples.
-  - `include_regex`: regex to include (or `include: [patterns]`)
-  - `exclude`: list of regexes to exclude
+  - `include_regex`: regex or list of regexes to include
+  - `exclude_regex`: regex or list of regexes to exclude
   - `keys`: explicit variable names to include
-  - `strip_prefix`: remove leading prefix from names
+  - `strip_prefix`, `strip_suffix`: remove leading/trailing text from emitted names. Each accepts a string or list.
 
 - `yaml`: Loads values from one or more YAML documents on disk. Files are merged in order so you can provide layered defaults plus environment overrides. Additional details live in [docs/SOURCE_YAML.md](docs/SOURCE_YAML.md).
   - `files`: list of YAML file paths (merged in order; later files override earlier)
@@ -108,7 +110,8 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `1password`: Fetches items from a 1Password vault and maps each item title to a secret. Requires the 1Password `op` CLI to be installed plus either a configured `service_account_token` or the `OP_SERVICE_ACCOUNT_TOKEN` environment variable for authentication. Full walkthrough: [docs/SOURCE_1PASSWORD.md](docs/SOURCE_1PASSWORD.md).
   - `vault`: Vault name (required).
   - `tag_filters`: Only items containing any of these tags are included. The list order also determines override priority when multiple items share the same title.
-  - `include_regex`: Optional regex applied to item titles for additional filtering.
+  - `include_regex`, `exclude_regex`: Optional regex or list of regexes applied to item titles.
+  - `strip_prefix`, `strip_suffix`: Optional emitted-name transforms. Each accepts a string or list.
   - `service_account_token`: Inline token value; falls back to the `OP_SERVICE_ACCOUNT_TOKEN` environment variable when omitted.
   - `concurrency`: Number of parallel fetches when pulling item details (default `8`).
 
@@ -121,12 +124,15 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - Authentication is environment-only via `INFISICAL_TOKEN` or `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`.
   - `rate_limit_rps`, `concurrency`: control throughput.
   - `recursive`, `include_imports`, `expand_secret_references`: control how Infisical returns secrets.
-  - `include_regex`, `tag_filters`, `strip_prefix`: filter and transform emitted secret names.
+  - `include_regex`, `exclude_regex`: filter emitted secret names. Each accepts a string or list.
+  - `strip_prefix`, `strip_suffix`: transform emitted secret names. Each accepts a string or list.
+  - `tag_filters`: Infisical API-side filtering.
 
 - `keeper`: Uses the Keeper Commander SDK/CLI session to pull records from Keeper Enterprise. Requires a logged-in Keeper Commander environment with persistent login or inline credentials. Reference guide: [docs/SOURCE_KEEPER.md](docs/SOURCE_KEEPER.md).
   - `folder`: Keeper folder or path to read from (required).
   - `tag_filters`: Only records whose custom `tags` field matches any supplied tag are included. The list order also determines override priority when multiple items share the same title.
-  - `include_regex`: Optional regex applied to record titles.
+  - `include_regex`, `exclude_regex`: Optional regex or list of regexes applied to record titles.
+  - `strip_prefix`, `strip_suffix`: Optional emitted-name transforms. Each accepts a string or list.
   - `config_file`: Path to the Keeper Commander config (default `~/.keeper/config.json`).
   - `keeper_server`, `keeper_user`, `keeper_password`: Inline overrides (or `KEEPER_SERVER`, `KEEPER_USER`, `KEEPER_PASSWORD` env vars) for CLI login values. Overrides what is read from `config_file`.
 
@@ -158,7 +164,8 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `path`: required target dotenv file path. Relative paths are resolved against the config file where they are declared.
   - `mode`: optional `merge` (default) or `replace`. `merge` updates matching keys and appends missing ones while preserving unrelated existing entries. `replace` rewrites the file from only the selected sink items.
   - `key_case`: optional `preserve` (default), `upper`, or `lower`.
-  - `strip_prefix` or `strip_prefixes`: optional prefix or list of prefixes removed from the start of each secret name before writing.
+  - `strip_prefix`, `strip_suffix`: optional transform rules removed from the start/end of each secret name before writing. Each accepts a string or list.
+  - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.
   - In `merge` mode, the sink behaves like the remote sinks: it updates matching keys and creates missing ones without deleting unrelated dotenv entries.
 
 The AWS API usage for both AWS sinks are paced automatically: the sinks meter requests so they stay within the configured `rate_limit_rps`, and they fall back to exponential backoff with jitter whenever AWS responds with throttling errors.
@@ -269,6 +276,8 @@ sinks:
       path: './out/.env'
       key_case: upper
       strip_prefix: 'APP_'
+      exclude_regex:
+        - '\\.[A-Za-z0-9]+$'
     sources: [ 'infisical' ]
 ```
 

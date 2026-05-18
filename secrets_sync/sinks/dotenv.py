@@ -31,17 +31,16 @@ class DotenvSink(BaseSink):
         if not raw_path:
             raise ValueError("Dotenv sink requires 'path'")
         self.path = Path(str(raw_path))
-        self.mode = self._normalize_mode(options)
-        self.key_case = self._normalize_key_case(options)
-        self.strip_prefixes = self._normalize_strip_prefixes(options)
+        self.mode = self._read_mode(options)
+        self.key_case = self._read_key_case(options)
 
-    def _normalize_mode(self, options: Dict[str, object]) -> str:
+    def _read_mode(self, options: Dict[str, object]) -> str:
         mode = str(options.get("mode") or "merge").strip().lower()
         if mode not in ("merge", "replace"):
             raise ValueError("Dotenv sink 'mode' must be 'merge' or 'replace'")
         return mode
 
-    def _normalize_key_case(self, options: Dict[str, object]) -> str:
+    def _read_key_case(self, options: Dict[str, object]) -> str:
         explicit = options.get("key_case")
         if explicit is not None:
             key_case = str(explicit).strip().lower()
@@ -63,28 +62,8 @@ class DotenvSink(BaseSink):
             return "lower"
         return "preserve"
 
-    def _normalize_strip_prefixes(self, options: Dict[str, object]) -> List[str]:
-        raw_value = options.get("strip_prefixes")
-        if raw_value is None:
-            raw_value = options.get("strip_prefix")
-        if raw_value is None:
-            return []
-        if isinstance(raw_value, list):
-            values = raw_value
-        else:
-            values = [raw_value]
-        prefixes = []
-        for value in values:
-            text = str(value).strip()
-            if text:
-                prefixes.append(text)
-        return prefixes
-
     def _transform_name(self, name: str) -> str:
-        transformed = name
-        for prefix in self.strip_prefixes:
-            if transformed.startswith(prefix):
-                transformed = transformed[len(prefix) :]
+        transformed = self.transform_name(name)
         if self.key_case == "upper":
             transformed = transformed.upper()
         elif self.key_case == "lower":
@@ -208,7 +187,7 @@ class DotenvSink(BaseSink):
         os.replace(temp_path, self.path)
 
     async def push_many(self, items: Iterable[SecretItem]) -> None:
-        item_list = list(items)
+        item_list = self.select_items(items)
         transformed_values: Dict[str, str] = {}
         transformed_items: Dict[str, SecretItem] = {}
 

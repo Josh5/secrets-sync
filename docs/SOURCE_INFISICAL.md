@@ -20,8 +20,10 @@ sources:
       include_imports: false
       expand_secret_references: true
       include_regex: "^APP_.*"
+      exclude_regex: "_DEBUG$"
       tag_filters: ["default", "dev"]
       strip_prefix: "APP_"
+      strip_suffix: "_FILE"
 ```
 
 - `host`: Optional Infisical base URL. Defaults to `INFISICAL_HOST` or `https://app.infisical.com`.
@@ -33,9 +35,11 @@ sources:
 - `recursive`: When `true`, includes nested folders under `secret_path`. Defaults to `false`.
 - `include_imports`: When `true`, includes imported secrets in the response. Defaults to `false`.
 - `expand_secret_references`: When `true`, resolves Infisical secret references before returning values. Defaults to `true`.
-- `include_regex`: Optional regex applied to secret names after Infisical returns them.
+- `include_regex`: Optional regex or list of regexes applied to secret names after Infisical returns them.
+- `exclude_regex`: Optional regex or list of regexes applied after inclusion.
 - `tag_filters`: Optional list of Infisical tags used by the API to filter which secrets are returned.
-- `strip_prefix`: Optional prefix removed from each secret name before the source emits it.
+- `strip_prefix`: Optional prefix transform removed from each secret name before the source emits it. Accepts a string or list.
+- `strip_suffix`: Optional suffix transform removed from each secret name before the source emits it. Accepts a string or list.
 
 The source emits one `SecretItem` per returned Infisical secret. Secret comments become `description` values when present.
 
@@ -124,6 +128,7 @@ Be careful when using:
 - `recursive: true`
 - `include_imports: true`
 - `strip_prefix`
+- `strip_suffix`
 
 These can cause different Infisical secrets to collapse to the same final emitted name. For example:
 
@@ -134,6 +139,8 @@ or:
 
 - `APP_DB_URL`
 - `DB_URL` with `strip_prefix: "APP_"`
+- `TLS_CERT_FILE`
+- `TLS_CERT` with `strip_suffix: "_FILE"`
 
 If that happens, the source fails instead of silently letting one secret overwrite another. Narrow the `secret_path`, disable `recursive`, or adjust local name filters so each emitted secret name stays unique.
 
@@ -199,4 +206,4 @@ sources:
 - `401` or `403`:
   - Check the token or machine identity credentials and confirm the identity has read access to the target project and path.
 - `duplicate secret names after applying local filters`:
-  - Narrow the path, disable recursive/imported reads, or adjust `strip_prefix` and `include_regex` so each emitted secret name is unique.
+  - Narrow the path, disable recursive/imported reads, or adjust the strip rules and regex filters so each emitted secret name is unique.

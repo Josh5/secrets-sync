@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 from collections.abc import Sequence
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
@@ -32,15 +31,19 @@ class KeeperSource(BaseSource):
         self.folder: str = str(o.get("folder") or "").strip()
         if not self.folder:
             raise ValueError("Keeper source requires 'folder' option")
-        self.tag_filters: List[str] = self._normalize_tag_list(o.get("tag_filters") or [])
+        self.tag_filters: List[str] = self._read_tag_list(o.get("tag_filters") or [])
         self._tag_filter_set: Set[str] = set(self.tag_filters)
-        include_regex = str(o.get("include_regex") or "").strip()
-        self.include_re: Optional[re.Pattern[str]] = re.compile(include_regex) if include_regex else None
         config_path = o.get("config_file") or "~/.keeper/config.json"
         self.config_file = os.path.expanduser(str(config_path))
-        self.keeper_server = self._clean_credential(o.get("keeper_server") or os.getenv("KEEPER_SERVER"))
-        self.keeper_user = self._clean_credential(o.get("keeper_user") or os.getenv("KEEPER_USER"))
-        self.keeper_password = self._clean_credential(o.get("keeper_password") or os.getenv("KEEPER_PASSWORD"))
+        self.keeper_server = self._clean_credential(
+            o.get("keeper_server") or os.getenv("KEEPER_SERVER")
+        )
+        self.keeper_user = self._clean_credential(
+            o.get("keeper_user") or os.getenv("KEEPER_USER")
+        )
+        self.keeper_password = self._clean_credential(
+            o.get("keeper_password") or os.getenv("KEEPER_PASSWORD")
+        )
 
     def _clean_credential(self, value: Optional[str]) -> Optional[str]:
         if value is None:
@@ -80,7 +83,9 @@ class KeeperSource(BaseSource):
             )
         params = get_params_from_config(self.config_file)
         if not params:
-            raise RuntimeError(f"Unable to load Keeper params from '{self.config_file}'")
+            raise RuntimeError(
+                f"Unable to load Keeper params from '{self.config_file}'"
+            )
         if self.keeper_server:
             params.server = self.keeper_server
         if self.keeper_user:
@@ -104,7 +109,9 @@ class KeeperSource(BaseSource):
         if not matches:
             raise ValueError(f"Keeper folder '{self.folder}' not found or inaccessible")
         for match in matches:
-            name = getattr(match, "name", "") or getattr(match, "folder_key_unencrypted", "")
+            name = getattr(match, "name", "") or getattr(
+                match, "folder_key_unencrypted", ""
+            )
             if str(name).strip() == self.folder:
                 return match
         return matches[0]
@@ -124,7 +131,9 @@ class KeeperSource(BaseSource):
                 return value
         return None
 
-    def _value_candidates(self, record: dict) -> Iterable[Union[str, Sequence[Any], None]]:
+    def _value_candidates(
+        self, record: dict
+    ) -> Iterable[Union[str, Sequence[Any], None]]:
         yield record.get("password")
         for field in self._field_entries(record, ("fields",)):
             yield field.get("value")
@@ -152,11 +161,16 @@ class KeeperSource(BaseSource):
             tags: List[str] = []
             for candidate in self._expand_field_values(field.get("value")):
                 tags.extend(self._split_and_strip(candidate))
-            return self._normalize_tag_list(tags)
+            return self._read_tag_list(tags)
         return []
 
     def _record_title(self, record: dict) -> str:
-        return str(record.get("title") or record.get("record_title") or record.get("name") or "")
+        return str(
+            record.get("title")
+            or record.get("record_title")
+            or record.get("name")
+            or ""
+        )
 
     def _record_uid(self, record: Any) -> Optional[str]:
         if record is None:
@@ -177,8 +191,8 @@ class KeeperSource(BaseSource):
     def _tags_match(self, record_tags: List[str]) -> bool:
         if not self._tag_filter_set:
             return True
-        normalized = {tag for tag in record_tags if tag}
-        return bool(normalized & self._tag_filter_set)
+        tags = {tag for tag in record_tags if tag}
+        return bool(tags & self._tag_filter_set)
 
     def _custom_entries(self, record: dict) -> Iterable[dict]:
         for entry in self._field_entries(record, ("custom_fields", "custom")):
@@ -187,7 +201,9 @@ class KeeperSource(BaseSource):
     def _field_label(self, field: dict) -> str:
         return str(field.get("label") or field.get("name") or "").strip().lower()
 
-    def _expand_field_values(self, raw_value: Union[str, Sequence[Any], None]) -> List[str]:
+    def _expand_field_values(
+        self, raw_value: Union[str, Sequence[Any], None]
+    ) -> List[str]:
         if raw_value is None:
             return []
         if isinstance(raw_value, str):
@@ -213,7 +229,9 @@ class KeeperSource(BaseSource):
                             yield entry
 
     def _split_and_strip(self, raw: str) -> List[str]:
-        return [part for part in (segment.strip() for segment in raw.split(",")) if part]
+        return [
+            part for part in (segment.strip() for segment in raw.split(",")) if part
+        ]
 
     def _container_value(self, record: dict, key: str) -> Optional[str]:
         for container in self._containers(record):
@@ -230,7 +248,7 @@ class KeeperSource(BaseSource):
             title = self._record_title(detail)
             if not title:
                 continue
-            if self.include_re and not self.include_re.search(title):
+            if not self.accepts_name(title):
                 continue
             tags = self._extract_tags(detail)
             if self.tag_filters and not self._tags_match(tags):

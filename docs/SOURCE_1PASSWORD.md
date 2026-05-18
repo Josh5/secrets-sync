@@ -93,7 +93,9 @@ sources:
     options:
       vault: "EnvironmentSecrets"
       tag_filters: ["default", "prod"]
-      include_regex: '^APP_.*'
+      include_regex: ['^APP_.*', '^SHARED_.*']
+      exclude_regex: '_DEBUG$'
+      strip_prefix: ['APP_', 'SHARED_']
       # Optional alternative to the environment variable. If you add this, keep this file secure!
       # service_account_token: "${OP_SERVICE_ACCOUNT_TOKEN}"
 ```
@@ -135,6 +137,7 @@ The tool prefers a `password` field, then any concealed field, then the first fi
   - Verify `OP_SERVICE_ACCOUNT_TOKEN` is set for the process running the tool (local shell or CI job).
 - Item missing from sync:
   - Check `include_regex` matches the item title.
+  - Check `exclude_regex` is not removing the item title.
   - Confirm the environment tag is included in `tag_filters`.
 - Duplicate titles:
   - Items are keyed by title. Keep one `default` item plus only the necessary overrides (e.g., `prod`, `staging`).

@@ -19,11 +19,19 @@ sinks:
 - `path`: Required output file path. Relative paths are resolved against the config file where they are declared.
 - `mode`: Optional `merge` (default) or `replace`.
 - `key_case`: Optional `preserve` (default), `upper`, or `lower`.
-- `strip_prefix` or `strip_prefixes`: Optional prefix or list of prefixes removed from the start of each secret name before writing.
+- `strip_prefix`: Optional prefix transform removed from the start of each secret name before writing. Accepts a string or list.
+- `strip_suffix`: Optional suffix transform removed from the end of each secret name before writing. Accepts a string or list.
 
 In `merge` mode, the sink updates existing matching keys in place, preserves unrelated existing lines, comments, and formatting where practical, and appends missing keys at the end of the file.
 
 In `replace` mode, the sink rewrites the target file from only the items routed to that sink. Keys are sorted before writing so output is deterministic.
+
+Sink-side filtering:
+
+- `include_regex`: Optional regex or list of regexes applied to secret names before dotenv key transforms run.
+- `exclude_regex`: Optional regex or list of regexes applied after inclusion.
+
+This is useful when one source contains a mix of environment-style keys and file-shaped keys. For example, you can exclude names ending in `.pem`, `.json`, or `.jwks` from the dotenv sink and route them to `dir_files` instead.
 
 ## Name transforms
 
