@@ -109,12 +109,17 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
                 if not isinstance(sink, dict):
                     continue
                 t = (sink.get("type") or "").lower()
-                if t != "dotenv":
+                if t not in ("dotenv", "dir_files"):
                     continue
                 opts = sink.get("options")
                 if not isinstance(opts, dict):
                     continue
-                raw_path = opts.get("path") or opts.get("file")
+                raw_path = (
+                    opts.get("path")
+                    or opts.get("file")
+                    or opts.get("dir")
+                    or opts.get("directory")
+                )
                 if (
                     isinstance(raw_path, str)
                     and raw_path
@@ -122,8 +127,9 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
                 ):
                     resolved = os.path.normpath(os.path.join(base_dir, raw_path))
                     opts["path"] = resolved
-                    if "file" in opts:
-                        del opts["file"]
+                    for key in ("file", "dir", "directory"):
+                        if key in opts:
+                            del opts[key]
 
         merged = _deep_merge(merged, data)
 

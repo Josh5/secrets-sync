@@ -106,6 +106,14 @@ def _prefixed_name(sink_cfg, item: SecretItem) -> str:
         elif key_case == "lower" or force_lower:
             name = name.lower()
         return name
+    if t == "dir_files":
+        name = transform_sink_item_name(opts, item.name)
+        base_path = str(
+            opts.get("path") or opts.get("dir") or opts.get("directory") or ""
+        ).strip()
+        if base_path:
+            return os.path.join(base_path, name)
+        return name
     return item.name
 
 
@@ -206,6 +214,10 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
                 prefix = opts.get("secret_path") or opts.get("path") or "/"
             elif t == "dotenv":
                 prefix = opts.get("path") or opts.get("file") or ""
+            elif t == "dir_files":
+                prefix = (
+                    opts.get("path") or opts.get("dir") or opts.get("directory") or ""
+                )
             selected = select_sink_items(sink_cfg, list(items.values()))
             items_list = [
                 {
@@ -229,9 +241,17 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
 
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Sync secrets to configured sinks")
-    p.add_argument("--file", "-f", action="append", dest="files",
-                   help="YAML config file(s) to merge; later overrides earlier", default=[])
-    p.add_argument("--print-values", action="store_true", help="Print gathered secrets to STDOUT")
+    p.add_argument(
+        "--file",
+        "-f",
+        action="append",
+        dest="files",
+        help="YAML config file(s) to merge; later overrides earlier",
+        default=[],
+    )
+    p.add_argument(
+        "--print-values", action="store_true", help="Print gathered secrets to STDOUT"
+    )
     p.add_argument(
         "--print-format",
         choices=["none", "list", "table", "json"],

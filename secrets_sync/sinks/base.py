@@ -240,4 +240,12 @@ def build_sink(
             print_sync_details=print_sync_details,
             detail_value_snapshots=detail_value_snapshots,
         )
+    if t == "dir_files":
+        from .dir_files import DirFilesSink
+
+        return DirFilesSink(
+            cfg,
+            print_sync_details=print_sync_details,
+            detail_value_snapshots=detail_value_snapshots,
+        )
     raise ValueError(f"Unknown sink type: {cfg.type}")

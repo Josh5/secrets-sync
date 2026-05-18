@@ -168,6 +168,11 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.
   - In `merge` mode, the sink behaves like the remote sinks: it updates matching keys and creates missing ones without deleting unrelated dotenv entries.
 
+- `dir_files`: Writes selected items to individual files in a local directory. Detailed behavior and examples are in [docs/SINK_DIR_FILES.md](docs/SINK_DIR_FILES.md).
+  - `path`: required target directory. Relative paths are resolved against the config file where they are declared.
+  - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.
+  - `strip_prefix`, `strip_suffix`: optional emitted-name transforms. Each accepts a string or list.
+
 The AWS API usage for both AWS sinks are paced automatically: the sinks meter requests so they stay within the configured `rate_limit_rps`, and they fall back to exponential backoff with jitter whenever AWS responds with throttling errors.
 
 Each sink may specify `sources: [source-name, ...]` to only accept items from those sources. If a sink references a source that does not exist, config loading fails with a clear error.
@@ -278,6 +283,12 @@ sinks:
       strip_prefix: 'APP_'
       exclude_regex:
         - '\\.[A-Za-z0-9]+$'
+    sources: [ 'infisical' ]
+  - name: app-file-secrets
+    type: dir_files
+    options:
+      path: './out/secrets.d'
+      include_regex: '\\.[A-Za-z0-9]+$'
     sources: [ 'infisical' ]
 ```
 
