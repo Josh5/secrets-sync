@@ -334,7 +334,7 @@ async def _main_async() -> int:
         )
     except Exception as e:
         return _log_user_error("Failed while pushing to sinks.", e)
-    logger.info("Push complete")
+    logger.info("Sync complete")
     if args.print_sync_details:
         logger.info(_format_sync_summary(summary, sink_count=len(cfg.sinks)))
     return 0
