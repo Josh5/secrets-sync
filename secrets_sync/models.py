@@ -15,6 +15,40 @@ class SecretItem:
 
 
 @dataclass
+class SyncSummary:
+    total: int = 0
+    created: int = 0
+    changed: int = 0
+    unchanged: int = 0
+    failed: int = 0
+
+    def record(self, action: str, *, failed: bool = False) -> None:
+        self.total += 1
+        if failed:
+            self.failed += 1
+            return
+        if action == "created":
+            self.created += 1
+            return
+        if action in ("updated", "changed"):
+            self.changed += 1
+            return
+        if action == "unchanged":
+            self.unchanged += 1
+
+    def merge(self, other: "SyncSummary") -> None:
+        self.total += other.total
+        self.created += other.created
+        self.changed += other.changed
+        self.unchanged += other.unchanged
+        self.failed += other.failed
+
+    @property
+    def updated(self) -> bool:
+        return self.created > 0 or self.changed > 0
+
+
+@dataclass
 class SourceConfig:
     type: str
     name: Optional[str] = None

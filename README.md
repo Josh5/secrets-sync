@@ -79,7 +79,7 @@ Flags:
 - `--print-values`: print a preview of what will be pushed, grouped by sink. Combine with `--dry-run` for preview only.
 - `--print-format {list,table,json}`: output format for preview (default `list`).
 - `--dry-run`: collect and optionally print, but do not push to remote sinks.
-- `--print-sync-details`: print a line for each item as it's synced (success/failure plus created/unchanged/changed). When combined with `--print-values`, each log also shows value snapshots (`created 'new'`, `unchanged 'old'`, or `changed 'old' -> 'new'`).
+- `--print-sync-details`: print a line for each item as it's synced (success/failure plus created/unchanged/changed). When combined with `--print-values`, each log also shows value snapshots (`created 'new'`, `unchanged 'old'`, or `changed 'old' -> 'new'`). After `Push complete`, the CLI also emits a final machine-friendly summary line like `SYNC_SUMMARY sinks=2 total=14 created=3 changed=4 unchanged=7 failed=0 updated=true`.
 
 ## Config
 

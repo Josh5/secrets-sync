@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Dict, Iterable, List, Optional, Sequence
 
-from ..models import SecretItem, SinkConfig
+from ..models import SecretItem, SinkConfig, SyncSummary
 from ..utils.logging import LevelColorFormatter, bcolours
 
 _detail_logger = logging.getLogger("secrets_sync.sync_details")
@@ -84,6 +84,7 @@ class BaseSink:
         self._detail_value_snapshots = bool(
             print_sync_details and detail_value_snapshots
         )
+        self.sync_summary = SyncSummary()
         options = config.options or {}
         self.include_res = _compile_regex_list(options.get("include_regex"))
         self.exclude_res = _compile_regex_list(options.get("exclude_regex"))
@@ -129,6 +130,7 @@ class BaseSink:
         old_value: Optional[str] = None,
         new_value: Optional[str] = None,
     ) -> None:
+        self.sync_summary.record(action)
         if not self._print_sync_details:
             return
         detail = self._format_action_detail(action, old_value, new_value)
@@ -146,6 +148,7 @@ class BaseSink:
         old_value: Optional[str] = None,
         new_value: Optional[str] = None,
     ) -> None:
+        self.sync_summary.record(action, failed=True)
         if not self._print_sync_details:
             return
         detail = self._format_action_detail(action, old_value, new_value)

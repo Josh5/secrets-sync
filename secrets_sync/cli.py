@@ -10,7 +10,7 @@ import json
 import boto3
 
 from .config import load_config_from_files
-from .models import SecretItem
+from .models import SecretItem, SyncSummary
 from .sources.base import build_source
 from .sinks.base import build_sink, select_sink_items, transform_sink_item_name
 from .utils.logging import setup_logging
@@ -53,7 +53,7 @@ async def push_to_sinks_from_cfg(
     *,
     print_sync_details: bool = False,
     detail_value_snapshots: bool = False,
-) -> None:
+) -> SyncSummary:
     sinks = [
         build_sink(
             s,
@@ -71,6 +71,24 @@ async def push_to_sinks_from_cfg(
             filtered = list(items.values())
         tasks.append(sink_obj.push_many(filtered))
     await asyncio.gather(*tasks)
+    summary = SyncSummary()
+    for sink_obj in sinks:
+        summary.merge(sink_obj.sync_summary)
+    return summary
+
+
+def _format_sync_summary(summary: SyncSummary, *, sink_count: int) -> str:
+    updated = "true" if summary.updated else "false"
+    return (
+        "SYNC_SUMMARY "
+        f"sinks={sink_count} "
+        f"total={summary.total} "
+        f"created={summary.created} "
+        f"changed={summary.changed} "
+        f"unchanged={summary.unchanged} "
+        f"failed={summary.failed} "
+        f"updated={updated}"
+    )
 
 
 def _prefixed_name(sink_cfg, item: SecretItem) -> str:
@@ -308,7 +326,7 @@ async def _main_async() -> int:
     logger.info("Pushing to sinks…")
     include_value_details = bool(args.print_sync_details and args.print_values)
     try:
-        await push_to_sinks_from_cfg(
+        summary = await push_to_sinks_from_cfg(
             cfg,
             items,
             print_sync_details=args.print_sync_details,
@@ -317,6 +335,8 @@ async def _main_async() -> int:
     except Exception as e:
         return _log_user_error("Failed while pushing to sinks.", e)
     logger.info("Push complete")
+    if args.print_sync_details:
+        logger.info(_format_sync_summary(summary, sink_count=len(cfg.sinks)))
     return 0
 
 
