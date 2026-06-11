@@ -170,6 +170,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 
 - `dir_files`: Writes selected items to individual files in a local directory. Detailed behavior and examples are in [docs/SINK_DIR_FILES.md](docs/SINK_DIR_FILES.md).
   - `path`: required target directory. Relative paths are resolved against the config file where they are declared.
+  - `file_mode`: optional octal file mode applied after each write, such as `"0600"` or `"0640"`.
   - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.
   - `strip_prefix`, `strip_suffix`: optional emitted-name transforms. Each accepts a string or list.
 

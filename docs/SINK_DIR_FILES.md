@@ -8,6 +8,7 @@ sinks:
     type: dir_files
     options:
       path: "./run/secrets"
+      file_mode: "0640"
       include_regex: "\\.[A-Za-z0-9]+$"
     sources: ["my-passwords"]
 ```
@@ -21,6 +22,7 @@ Each selected secret becomes one file:
 Options:
 
 - `path`: Required target directory. Relative paths are resolved relative to the config file where the sink is declared.
+- `file_mode`: Optional octal file mode applied after each write, such as `"0600"` or `"0640"`. This also applies when replacing an existing file.
 - `include_regex`: Optional regex or list of regexes applied to secret names before writing. Non-matching items are skipped.
 - `exclude_regex`: Optional regex or list of regexes to skip after inclusion.
 - `strip_prefix`: Optional prefix transform removed from the emitted file name. Accepts a string or list.

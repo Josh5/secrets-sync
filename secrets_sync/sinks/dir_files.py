@@ -28,6 +28,34 @@ class DirFilesSink(BaseSink):
         if not raw_path:
             raise ValueError("Dir files sink requires 'path'")
         self.path = Path(str(raw_path))
+        self.file_mode = self._read_file_mode(options)
+
+    def _read_file_mode(self, options: Dict[str, object]) -> int | None:
+        raw_mode = options.get("file_mode")
+        if raw_mode is None:
+            raw_mode = options.get("permissions")
+        if raw_mode is None or raw_mode == "":
+            return None
+
+        if isinstance(raw_mode, int):
+            mode = raw_mode
+        else:
+            text = str(raw_mode).strip().lower()
+            try:
+                if text.startswith("0o"):
+                    mode = int(text, 8)
+                elif text.startswith("0") and text != "0":
+                    mode = int(text, 8)
+                else:
+                    mode = int(text, 8)
+            except ValueError as exc:
+                raise ValueError(
+                    "Dir files sink 'file_mode' must be an octal file mode such as '0600' or '0644'"
+                ) from exc
+
+        if mode < 0 or mode > 0o777:
+            raise ValueError("Dir files sink 'file_mode' must be between 0000 and 0777")
+        return mode
 
     def _transform_name(self, name: str) -> str:
         return self.transform_name(name)
@@ -62,6 +90,8 @@ class DirFilesSink(BaseSink):
             handle.write(value)
             temp_path = handle.name
         os.replace(temp_path, target_path)
+        if self.file_mode is not None:
+            os.chmod(target_path, self.file_mode)
 
     async def push_many(self, items: Iterable[SecretItem]) -> None:
         item_list = self.select_items(items)
