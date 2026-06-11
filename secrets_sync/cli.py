@@ -25,7 +25,7 @@ def _log_user_error(summary: str, exc: Exception) -> int:
     return 1
 
 
-async def collect_secrets_from_cfg(cfg) -> Dict[str, SecretItem]:
+async def collect_secrets_from_cfg(cfg) -> List[SecretItem]:
 
     # Configure AWS session from cfg.aws or env (GitLab CI vars supported)
     session_kwargs = {}
@@ -40,16 +40,15 @@ async def collect_secrets_from_cfg(cfg) -> Dict[str, SecretItem]:
     sources = [build_source(s) for s in cfg.sources]
     results = await asyncio.gather(*[s.pull() for s in sources])
 
-    merged: Dict[str, SecretItem] = {}
+    collected: List[SecretItem] = []
     for d in results:
-        for k, item in (d or {}).items():
-            merged[k] = item  # last-in wins
-    return merged
+        collected.extend((d or {}).values())
+    return collected
 
 
 async def push_to_sinks_from_cfg(
     cfg,
-    items: Dict[str, SecretItem],
+    items: List[SecretItem],
     *,
     print_sync_details: bool = False,
     detail_value_snapshots: bool = False,
@@ -66,9 +65,9 @@ async def push_to_sinks_from_cfg(
     tasks = []
     for sink_obj, sink_cfg in zip(sinks, cfg.sinks):
         if sink_cfg.sources:
-            filtered = [i for i in items.values() if i.source in sink_cfg.sources]
+            filtered = [i for i in items if i.source in sink_cfg.sources]
         else:
-            filtered = list(items.values())
+            filtered = list(items)
         tasks.append(sink_obj.push_many(filtered))
     await asyncio.gather(*tasks)
     summary = SyncSummary()
@@ -156,7 +155,7 @@ def _print_table(headers: List[str], rows: List[List[str]]) -> None:
         )
 
 
-def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> None:
+def print_sink_outputs(cfg, items: List[SecretItem], fmt: str = "list") -> None:
     for sink_cfg in cfg.sinks:
         t = (sink_cfg.type or "").lower()
         opts = sink_cfg.options or {}
@@ -191,7 +190,7 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
             header += " " + " ".join(header_details)
 
         # Filter by configured sources
-        selected = select_sink_items(sink_cfg, list(items.values()))
+        selected = select_sink_items(sink_cfg, items)
         if fmt == "none":
             # Don't print anything
             pass
@@ -236,7 +235,7 @@ def print_sink_outputs(cfg, items: Dict[str, SecretItem], fmt: str = "list") -> 
                 prefix = (
                     opts.get("path") or opts.get("dir") or opts.get("directory") or ""
                 )
-            selected = select_sink_items(sink_cfg, list(items.values()))
+            selected = select_sink_items(sink_cfg, items)
             items_list = [
                 {
                     "name": _prefixed_name(sink_cfg, it),
