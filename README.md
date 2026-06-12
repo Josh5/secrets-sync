@@ -138,7 +138,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 
 ### Sinks
 
-- `ssm` options:
+- `ssm`: Writes to AWS Systems Manager Parameter Store. Detailed behavior and examples are in [docs/SINK_AWS_SSM.md](docs/SINK_AWS_SSM.md).
   - `prefix`: optional string prefix for parameter names (supports `{{ VAR }}` placeholders)
   - `type`: `SecureString` (default) or `String` (any other value errors at load time)
   - `tier`: `Standard` (default) or `Advanced`. Values over 4 KB (measured after UTF-8 encoding) are automatically promoted to the Advanced tier with a warning so large file-style secrets can be stored without changing the source config. Note: Values over 8 KB will fail with an error.
@@ -146,7 +146,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `kms_key_id`: optional KMS key id for SecureString
   - `rate_limit_rps`, `concurrency`: control throughput
 
-- `secrets_manager` options:
+- `secrets_manager`: Writes to AWS Secrets Manager. Detailed behavior and examples are in [docs/SINK_AWS_SECRETS_MANAGER.md](docs/SINK_AWS_SECRETS_MANAGER.md).
   - `prefix`: optional string prefix for secret names (supports `{{ VAR }}`)
   - `kms_key_id`, `rate_limit_rps`, `concurrency` similar to SSM
 
