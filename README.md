@@ -163,6 +163,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
 - `dotenv`: Writes the selected items into a local dotenv file. Detailed behavior and examples are in [docs/SINK_DOTENV.md](docs/SINK_DOTENV.md).
   - `path`: required target dotenv file path. Relative paths are resolved against the config file where they are declared.
   - `mode`: optional `merge` (default) or `replace`. `merge` updates matching keys and appends missing ones while preserving unrelated existing entries. `replace` rewrites the file from only the selected sink items.
+  - `file_mode`: optional octal file mode applied after each write, such as `"0600"` or `"0640"`.
   - `key_case`: optional `preserve` (default), `upper`, or `lower`.
   - `strip_prefix`, `strip_suffix`: optional transform rules removed from the start/end of each secret name before writing. Each accepts a string or list.
   - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.

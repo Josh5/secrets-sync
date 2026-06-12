@@ -11,6 +11,7 @@ sinks:
     options:
       path: "./generated/.env"
       mode: "merge"
+      file_mode: "0600"
       key_case: "upper"
       strip_prefix: "APP_"
     sources: ["infisical-config"]
@@ -18,6 +19,7 @@ sinks:
 
 - `path`: Required output file path. Relative paths are resolved against the config file where they are declared.
 - `mode`: Optional `merge` (default) or `replace`.
+- `file_mode`: Optional octal file mode applied after each write, such as `"0600"` or `"0640"`.
 - `key_case`: Optional `preserve` (default), `upper`, or `lower`.
 - `strip_prefix`: Optional prefix transform removed from the start of each secret name before writing. Accepts a string or list.
 - `strip_suffix`: Optional suffix transform removed from the end of each secret name before writing. Accepts a string or list.
