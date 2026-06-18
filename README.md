@@ -165,6 +165,7 @@ Example: [examples/basic/dev.yaml](examples/basic/dev.yaml).
   - `mode`: optional `merge` (default) or `replace`. `merge` updates matching keys and appends missing ones while preserving unrelated existing entries. `replace` rewrites the file from only the selected sink items.
   - `file_mode`: optional octal file mode applied after each write, such as `"0600"` or `"0640"`.
   - `key_case`: optional `preserve` (default), `upper`, or `lower`.
+  - `value_format`: optional `parsed` (default) or `raw`. Use `raw` when the target reader expects literal `KEY=value` content, such as Docker Compose `env_file.format: raw`.
   - `strip_prefix`, `strip_suffix`: optional transform rules removed from the start/end of each secret name before writing. Each accepts a string or list.
   - `include_regex`, `exclude_regex`: optional sink-side regex filters on secret names before writing. Each accepts a string or list.
   - In `merge` mode, the sink behaves like the remote sinks: it updates matching keys and creates missing ones without deleting unrelated dotenv entries.

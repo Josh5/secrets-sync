@@ -13,6 +13,7 @@ sinks:
       mode: "merge"
       file_mode: "0600"
       key_case: "upper"
+      value_format: "parsed"
       strip_prefix: "APP_"
     sources: ["infisical-config"]
 ```
@@ -21,6 +22,7 @@ sinks:
 - `mode`: Optional `merge` (default) or `replace`.
 - `file_mode`: Optional octal file mode applied after each write, such as `"0600"` or `"0640"`.
 - `key_case`: Optional `preserve` (default), `upper`, or `lower`.
+- `value_format`: Optional `parsed` (default) or `raw`.
 - `strip_prefix`: Optional prefix transform removed from the start of each secret name before writing. Accepts a string or list.
 - `strip_suffix`: Optional suffix transform removed from the end of each secret name before writing. Accepts a string or list.
 
@@ -63,13 +65,35 @@ If a source secret name contains characters outside that pattern after transform
 
 ## Value formatting
 
-The sink writes simple values without quotes when safe, and uses double-quoted escaping when needed for spaces, `#`, quotes, or multiline content.
+In `parsed` mode, the sink writes simple values without quotes when safe, and uses double-quoted escaping when needed for spaces, `#`, quotes, or multiline content.
 
 Examples:
 
 - `API_URL=https://example.com`
 - `GREETING="hello world"`
 - `PRIVATE_KEY="line1\nline2"`
+
+In `raw` mode, the sink writes values exactly as provided after the `=` with no added escaping.
+
+Examples:
+
+- `API_URL=https://example.com`
+- `API_KEY_AND_SECRET_PAIRS={"key": "bcrypt_sha256$$2b$12$..."}`
+- `PRIVATE_KEY=-----BEGIN KEY-----`
+
+`raw` is intended for readers that support a literal env-file mode, especially Docker Compose:
+
+```yaml
+services:
+  app:
+    env_file:
+      - path: ./.config.env
+        format: raw
+      - path: ./.secrets.env
+        format: raw
+```
+
+Use `raw` only when the downstream consumer expects literal values. If a reader expects standard dotenv parsing semantics, keep the default `parsed` mode.
 
 ## Example configs
 
@@ -93,6 +117,7 @@ sinks:
       path: "./generated/.env"
       mode: "merge"
       key_case: "upper"
+      value_format: "parsed"
       strip_prefix: "APP_"
     sources: ["infisical-config"]
 ```
@@ -106,6 +131,7 @@ sinks:
     options:
       path: "./compose/.env"
       mode: "merge"
+      value_format: "parsed"
       strip_prefixes: ["APP_", "DEV_"]
     sources: ["env", "yaml"]
 ```
@@ -120,6 +146,20 @@ sinks:
       path: "./generated/.env"
       mode: "replace"
       key_case: "lower"
+      value_format: "parsed"
+    sources: ["infisical-config"]
+```
+
+Generate a file intended for Docker Compose `format: raw`:
+
+```yaml
+sinks:
+  - name: compose-env
+    type: dotenv
+    options:
+      path: "./compose/.config.env"
+      mode: "replace"
+      value_format: "raw"
     sources: ["infisical-config"]
 ```
 

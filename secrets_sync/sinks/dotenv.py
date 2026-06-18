@@ -34,6 +34,7 @@ class DotenvSink(BaseSink):
         self.file_mode = self._read_file_mode(options)
         self.mode = self._read_mode(options)
         self.key_case = self._read_key_case(options)
+        self.value_format = self._read_value_format(options)
 
     def _read_file_mode(self, options: Dict[str, object]) -> int | None:
         raw_mode = options.get("file_mode")
@@ -90,6 +91,12 @@ class DotenvSink(BaseSink):
             return "lower"
         return "preserve"
 
+    def _read_value_format(self, options: Dict[str, object]) -> str:
+        value_format = str(options.get("value_format") or "parsed").strip().lower()
+        if value_format not in ("parsed", "raw"):
+            raise ValueError("Dotenv sink 'value_format' must be 'parsed' or 'raw'")
+        return value_format
+
     def _transform_name(self, name: str) -> str:
         transformed = self.transform_name(name)
         if self.key_case == "upper":
@@ -113,6 +120,8 @@ class DotenvSink(BaseSink):
             )
 
     def _format_value(self, value: str) -> str:
+        if self.value_format == "raw":
+            return value
         if value and re.fullmatch(r"[A-Za-z0-9_./:@+-]+", value):
             return value
         escaped = (
@@ -137,12 +146,19 @@ class DotenvSink(BaseSink):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             return None
-        if line.startswith("export "):
-            line = line[len("export ") :].lstrip()
-        if "=" not in line:
+
+        parse_line = raw_line.rstrip("\r\n")
+        parse_line = parse_line.lstrip()
+        if parse_line.startswith("export "):
+            parse_line = parse_line[len("export ") :].lstrip()
+        if "=" not in parse_line:
             return None
-        name, raw_value = line.split("=", 1)
+
+        name, raw_value = parse_line.split("=", 1)
         key = name.strip()
+        if self.value_format == "raw":
+            return key, raw_value
+
         value = raw_value.strip()
         if len(value) >= 2 and value[0] == value[-1] == '"':
             unquoted = value[1:-1]
