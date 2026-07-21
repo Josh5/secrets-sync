@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import yaml
 
@@ -65,89 +65,142 @@ def _interpolate(obj: Any, vars_map: Dict[str, str]) -> Any:
     return obj
 
 
+def _resolve_vars(env_vars: Dict[str, str], cfg_vars: Dict[str, Any]) -> Dict[str, str]:
+    """Resolve config variables recursively, using environment variables as leaves."""
+    raw_cfg_vars = {str(k): str(v) for k, v in cfg_vars.items()}
+    resolved_cfg_vars: Dict[str, str] = {}
+    resolving: List[str] = []
+
+    def resolve(key: str) -> str:
+        if key in resolved_cfg_vars:
+            return resolved_cfg_vars[key]
+        if key not in raw_cfg_vars:
+            if key not in env_vars:
+                raise ValueError(f"Missing variable '{key}' for template interpolation")
+            return str(env_vars[key])
+        if key in resolving:
+            cycle_start = resolving.index(key)
+            cycle = resolving[cycle_start:] + [key]
+            raise ValueError(f"Cyclic variable reference: {' -> '.join(cycle)}")
+
+        resolving.append(key)
+        try:
+            value = _VAR_PATTERN.sub(lambda match: resolve(match.group(1)), raw_cfg_vars[key])
+        finally:
+            resolving.pop()
+        resolved_cfg_vars[key] = value
+        return value
+
+    for key in raw_cfg_vars:
+        resolve(key)
+
+    return {**env_vars, **resolved_cfg_vars}
+
+
+def _types_by_name(items: Any) -> Dict[str, str]:
+    return {
+        str(item["name"]): str(item.get("type") or "").lower()
+        for item in _coerce_list(items)
+        if isinstance(item, dict) and item.get("name") is not None
+    }
+
+
+def _effective_type(item: Dict[str, Any], types_by_name: Dict[str, str]) -> str:
+    name = item.get("name")
+    if name is not None and str(name) in types_by_name:
+        return types_by_name[str(name)]
+    return str(item.get("type") or "").lower()
+
+
+def _resolve_document_paths(
+    data: Dict[str, Any],
+    base_dir: str,
+    source_types: Dict[str, str],
+    sink_types: Dict[str, str],
+) -> None:
+    """Resolve local paths while their declaring config file is still known."""
+    src_list = data.get("secrets_sources") or data.get("sources")
+    for src in _coerce_list(src_list):
+        if not isinstance(src, dict):
+            continue
+        if _effective_type(src, source_types) != "yaml":
+            continue
+        opts = src.get("options")
+        if not isinstance(opts, dict):
+            continue
+        files = opts.get("files")
+        single = opts.get("file")
+        if single and not files:
+            files = [single]
+        if isinstance(files, list):
+            opts["files"] = [
+                os.path.normpath(os.path.join(base_dir, path))
+                if isinstance(path, str) and not os.path.isabs(path)
+                else path
+                for path in files
+            ]
+            if "file" in opts:
+                del opts["file"]
+
+    for sink in _coerce_list(data.get("sinks")):
+        if not isinstance(sink, dict):
+            continue
+        if _effective_type(sink, sink_types) not in ("dotenv", "dir_files"):
+            continue
+        opts = sink.get("options")
+        if not isinstance(opts, dict):
+            continue
+        raw_path = opts.get("path") or opts.get("file") or opts.get("dir") or opts.get("directory")
+        if isinstance(raw_path, str) and raw_path and not os.path.isabs(raw_path):
+            opts["path"] = os.path.normpath(os.path.join(base_dir, raw_path))
+            for key in ("file", "dir", "directory"):
+                if key in opts:
+                    del opts[key]
+
+
 def load_config_from_files(paths: List[str]) -> AppConfig:
     if not paths:
         raise ValueError("At least one config file must be provided")
-    merged: Dict[str, Any] = {}
+    documents: List[Tuple[Dict[str, Any], str]] = []
+    raw_merged: Dict[str, Any] = {}
     for p in paths:
         with open(p, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-
-        # Resolve relative file paths in YAML sources relative to this config file
+        if not isinstance(data, dict):
+            raise ValueError(f"Config file '{p}' must contain a mapping at the root")
         base_dir = os.path.dirname(os.path.abspath(p))
-        src_list = data.get("secrets_sources") or data.get("sources")
-        if isinstance(src_list, list):
-            for src in src_list:
-                if not isinstance(src, dict):
-                    continue
-                t = (src.get("type") or "").lower()
-                if t != "yaml":
-                    continue
-                opts = src.get("options")
-                if not isinstance(opts, dict):
-                    continue
-                files = opts.get("files")
-                single = opts.get("file")
-                if single and not files:
-                    files = [single]
-                if isinstance(files, list):
-                    resolved = []
-                    for fp in files:
-                        if isinstance(fp, str) and not os.path.isabs(fp):
-                            resolved.append(
-                                os.path.normpath(os.path.join(base_dir, fp))
-                            )
-                        else:
-                            resolved.append(fp)
-                    opts["files"] = resolved
-                    if "file" in opts:
-                        del opts["file"]
-
-        sink_list = data.get("sinks")
-        if isinstance(sink_list, list):
-            for sink in sink_list:
-                if not isinstance(sink, dict):
-                    continue
-                t = (sink.get("type") or "").lower()
-                if t not in ("dotenv", "dir_files"):
-                    continue
-                opts = sink.get("options")
-                if not isinstance(opts, dict):
-                    continue
-                raw_path = (
-                    opts.get("path")
-                    or opts.get("file")
-                    or opts.get("dir")
-                    or opts.get("directory")
-                )
-                if (
-                    isinstance(raw_path, str)
-                    and raw_path
-                    and not os.path.isabs(raw_path)
-                ):
-                    resolved = os.path.normpath(os.path.join(base_dir, raw_path))
-                    opts["path"] = resolved
-                    for key in ("file", "dir", "directory"):
-                        if key in opts:
-                            del opts[key]
-
-        merged = _deep_merge(merged, data)
+        documents.append((data, base_dir))
+        raw_merged = _deep_merge(raw_merged, data)
 
     # Build vars map: environment first, then config vars override env
     env_vars = dict(os.environ)
-    cfg_vars = merged.get("vars", {}) or {}
+    cfg_vars = raw_merged.get("vars", {}) or {}
     if not isinstance(cfg_vars, dict):
         raise ValueError("'vars' must be a mapping of key: value")
-    vars_map: Dict[str, str] = {**env_vars, **{k: str(v) for k, v in cfg_vars.items()}}
+    vars_map = _resolve_vars(env_vars, cfg_vars)
 
-    # Interpolate placeholders across the entire structure
-    merged = _interpolate(merged, vars_map)
+    # Interpolate documents before resolving paths, while retaining the directory
+    # of the document that declared each path.
+    interpolated_documents = [
+        (_interpolate(data, vars_map), base_dir) for data, base_dir in documents
+    ]
+    interpolated_merged: Dict[str, Any] = {}
+    for data, _ in interpolated_documents:
+        interpolated_merged = _deep_merge(interpolated_merged, data)
+
+    source_types = _types_by_name(
+        interpolated_merged.get("secrets_sources") or interpolated_merged.get("sources")
+    )
+    sink_types = _types_by_name(interpolated_merged.get("sinks"))
+
+    merged: Dict[str, Any] = {}
+    for data, base_dir in interpolated_documents:
+        _resolve_document_paths(data, base_dir, source_types, sink_types)
+        merged = _deep_merge(merged, data)
 
     aws_data = merged.get("aws", {}) or {}
     aws = AwsConfig(
-        region=aws_data.get("region")
-        or os.getenv("AWS_DEFAULT_REGION")
-        or os.getenv("AWS_REGION"),
+        region=aws_data.get("region") or os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION"),
         profile=aws_data.get("profile") or os.getenv("AWS_PROFILE"),
     )
 
@@ -178,9 +231,7 @@ def load_config_from_files(paths: List[str]) -> AppConfig:
         for ref in src_filter:
             if ref not in valid_source_names:
                 sink_label = s.get("name") or s.get("type") or "<unnamed-sink>"
-                raise ValueError(
-                    f"Sink '{sink_label}' references unknown source '{ref}'"
-                )
+                raise ValueError(f"Sink '{sink_label}' references unknown source '{ref}'")
         sinks.append(
             SinkConfig(
                 name=s.get("name"),
